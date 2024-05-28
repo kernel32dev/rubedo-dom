@@ -1,0 +1,30 @@
+{
+    "name": "levi-dom",
+    "version": "0.0.0",
+    "description": "A simple JSX implementation that supports the state class",
+    "main": "index.js",
+    "types": "index.d.ts",
+    "files": [
+        "index.js",
+        "index.d.ts",
+        "jsx-runtime.js",
+        "jsx-runtime.d.ts",
+        "jsx-dev-runtime.js",
+        "jsx-dev-runtime.d.ts",
+        "html.d.ts",
+        "css.d.ts"
+    ],
+    "scripts": {},
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/kernel32dev/levi-dom.git"
+    },
+    "keywords": [
+        "dom", "jsx", "state"
+    ],
+    "author": "kernel32dev",
+    "license": "MIT",
+    "dependencies": {
+        "levi-state": "0.0.0"
+    }
+}
