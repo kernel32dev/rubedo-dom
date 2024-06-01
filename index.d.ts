@@ -1,5 +1,5 @@
 export * from "levi-state";
-import type { OrDerived } from "levi-state";
+import type { Derived, Mutation } from "levi-state";
 import type { HTML, JSX } from "./html";
 
 // support for custom elements will come later
@@ -17,8 +17,8 @@ import type { HTML, JSX } from "./html";
  * 5. Iterable (iterated and added)
  * 6. Derived (will be updated automatically)
  */
-export type Nodes = OrDerived<StatelessNodes>;
-type StatelessNodes = Node | string | number | Iterable<StatelessNodes> | boolean | null | undefined | View;
+export type Nodes = Derived.Or<StatelessNodes>;
+type StatelessNodes = Node | string | number | Iterable<StatelessNodes> | StatelessNodes[] | boolean | null | undefined | View;
 
 /** the output of a jsx element */
 export type Elems = HTMLElement | SVGElement | DocumentFragment;
