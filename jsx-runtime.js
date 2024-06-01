@@ -437,8 +437,15 @@ function jsx_apply_mutation(output, mut) {
         }
         if (mut instanceof Mutation.Move) {
             if (output.length !== mut.target.length) debugger;
-            console.log("TODO! Mutation.Move");
-            return jsx_apply_total_mutation(output, mut.target);
+            const from = mut.from;
+            const to = mut.to;
+            const length = mut.length;
+            const last = jsx_get_last_of_output(output[to && to - 1]);
+            const parent = last.parentNode;
+            const moved = output.slice(from, from + length);
+            if (parent) jsx_insert_before_recursive(moved, parent, to ? last.nextSibling : last);
+            output.move(from, to, length);
+            return output;
         }
         if (mut instanceof Mutation.Purge) {
             if (output.length === mut.dropped_count) {
@@ -453,8 +460,22 @@ function jsx_apply_mutation(output, mut) {
             return output;
         }
         if (mut instanceof Mutation.Shuffle) {
-            console.log("TODO! Mutation.Shuffle");
-            return jsx_apply_total_mutation(output, mut.target);
+            const last = jsx_get_last_of_output(output);
+            const parent = last.parentNode;
+            const lastSibling = last.nextSibling;
+            const map = mut.map;
+            const copy = Array.from(output);
+            output.length = map.length;
+            for (let i = 0; i < map.length; i++) {
+                const source = map[i];
+                const item = source !== -1 ? copy[source] : jsx_apply_total_mutation(null, mut.target[i]);
+                if (parent) jsx_insert_before_recursive(item, parent, lastSibling);
+                output[i] = item;
+            }
+            for (const i in mut.dropped) {
+                jsx_remove_recursive(copy[i]);
+            }
+            return output;
         }
     }
     return jsx_apply_total_mutation(output, mut.target);
