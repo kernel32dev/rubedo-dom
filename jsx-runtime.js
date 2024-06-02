@@ -481,6 +481,14 @@ function jsx_apply_mutation(output, mut) {
             return output;
         }
     }
+    /** @type {Mutation<unknown>} */
+    let i = mut;
+    while (i instanceof Mutation.NestedProperty || i instanceof Mutation.NestedItem) i = i.mut;
+    if (i instanceof Mutation.Nested) {
+        // ignore changes inside derived or nested inside objects into a derived
+        // this is what causes the jsx to ignore changes inside derived objects, unlike the rest of the state rules
+        return output;
+    }
     return jsx_apply_total_mutation(output, mut.target);
 }
 
