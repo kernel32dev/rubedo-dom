@@ -4,7 +4,7 @@ import { State, Derived, Mutation } from "levi-state";
 /** @typedef {import(".").PropsElem | import(".").PropsSVG} Props */
 /** @typedef {import(".").Nodes} Nodes */
 /** @typedef {import(".").Elems} Elems */
-/** @typedef {Nodes extends import("levi-state").Derived.Or<infer U> ? U : never} StatelessNodes */
+/** @typedef {Nodes extends infer T | import("levi-state").Derived<infer U> ? U : never} DeriveableNodes */
 
 /** @typedef {Node | OutputArray} Output */
 /** @typedef {Output[]} OutputArray */
@@ -60,6 +60,7 @@ export function jsx(tag, props) {
             // nothing to do
         } else if (typeof ref === "object" && ref) {
             if (ref instanceof State) {
+                /** @type {any} */
                 const state_value = ref.value;
                 if (typeof state_value === "object" && state_value !== null && typeof state_value.current === "object") {
                     state_value.current = elem;
@@ -108,7 +109,7 @@ function jsx_apply_props(elem, props) {
             } else if (!("disabled" in props)) {
                 elem.disabled = true;
             }
-            value.do(x => {
+            value.do((/** @type {any} */ x) => {
                 x = "" + x;
                 if (x !== elem.value) elem.value = x;
             });
@@ -121,7 +122,7 @@ function jsx_apply_props(elem, props) {
             } else if (!("disabled" in props)) {
                 elem.disabled = true;
             }
-            value.do(x => {
+            value.do((/** @type {any} */ x) => {
                 x = !!x;
                 if (x !== elem.checked) elem.checked = x;
             });
@@ -137,6 +138,7 @@ function jsx_apply_props(elem, props) {
                     // get the stateful array from the state, if it is not an array, assign it one
                     if (!Array.isArray(value.value)) value.value = [];
                     // this the array that needs to have its items updated
+                    /** @type {any} */
                     const output = value.value;
 
                     // this is the array of options from which we must read
@@ -214,6 +216,7 @@ function jsx_apply_props(elem, props) {
                 value.call(elem, elem);
             } else if (typeof value === "object") {
                 if (value instanceof State) {
+                    /** @type {any} */
                     const state_value = value.value;
                     if (typeof state_value === "object" && state_value !== null && typeof state_value.current === "object") {
                         state_value.current = elem;
@@ -366,7 +369,7 @@ function jsx_apply_children(elem, child, state_sym_context) {
     }
 }
 
-/** @param {Node} elem @param {Derived<StatelessNodes>} state */
+/** @param {Node} elem @param {Derived<DeriveableNodes>} state */
 function jsx_apply_stateful_children(elem, state) {
     if (sym_jsx in state) {
         if (jsx_get_parent_recursive(/** @type {Output} */(state[sym_jsx])) !== elem) {
@@ -383,9 +386,9 @@ function jsx_apply_stateful_children(elem, state) {
 }
 
 /**
- * @this {Derived<StatelessNodes>}
- * @param {StatelessNodes} _
- * @param {Mutation.Of<StatelessNodes>} mut
+ * @this {Derived<DeriveableNodes>}
+ * @param {DeriveableNodes} _
+ * @param {Mutation.Of<DeriveableNodes>} mut
  */
 function jsx_mutation_handler(_, mut) {
     this[sym_jsx] = jsx_apply_mutation(/** @type {Output} */(this[sym_jsx]), mut);
@@ -393,7 +396,7 @@ function jsx_mutation_handler(_, mut) {
 
 /**
  * @param {Output} output
- * @param {Mutation.Of<StatelessNodes>} mut
+ * @param {Mutation.Of<DeriveableNodes | DeriveableNodes[]>} mut
  * @returns {Output}
  */
 function jsx_apply_mutation(output, mut) {
@@ -491,7 +494,7 @@ function jsx_apply_clear(output) {
     return new_output;
 }
 
-/** @param {Output | null} output  @param {StatelessNodes} child @returns {Output} */
+/** @param {Output | null} output  @param {DeriveableNodes} child @returns {Output} */
 function jsx_apply_total_mutation(output, child) {
     if (!child || typeof child !== "object") {
         const text = /** @type {string} */ (typeof child === "string" || typeof child === "number" ? "" + child : "");

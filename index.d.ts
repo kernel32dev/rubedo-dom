@@ -1,5 +1,5 @@
 export * from "levi-state";
-import type { Derived, Mutation } from "levi-state";
+import type { Derived } from "levi-state";
 import type { HTML, JSX } from "./html";
 
 // support for custom elements will come later
@@ -17,8 +17,9 @@ import type { HTML, JSX } from "./html";
  * 5. Iterable (iterated and added)
  * 6. Derived (will be updated automatically)
  */
-export type Nodes = Derived.Or<StatelessNodes>;
-type StatelessNodes = Node | string | number | Iterable<StatelessNodes> | StatelessNodes[] | boolean | null | undefined | View;
+export type Nodes = BasicNodes | Iterable<Nodes> | Derived<DeriveableNodes>;
+type DeriveableNodes = BasicNodes | DeriveableNodes[];
+type BasicNodes = Node | string | number | boolean | null | undefined | View;
 
 /** the output of a jsx element */
 export type Elems = HTMLElement | SVGElement | DocumentFragment;
@@ -37,12 +38,15 @@ export interface View {
 export type PropsElem = HTML.HTMLAttributes<HTMLElement>;
 /** all the properties of SVGElement, not the `<svg>` element itself, but the base of all svg related elements */
 export type PropsSVG = HTML.SVGProps<SVGElement>;
-/** all the properties of HTMLElement but with the specifed type in the place of this, useful for defining custom elements */
-export type PropsAs<T> = HTML.HTMLAttributes<T>;
 /** all the properties of an element, by tag name */
 export type PropsOf<T extends keyof JSX.IntrinsicElements> = JSX.IntrinsicElements[T];
-/** all the properties of a class element */
-export type PropsOfClass<T extends abstract new (props: any) => any> = T extends abstract new (props: infer P) => any ? P : never;
+// support for custom elements will come later
+//
+// /** all the properties of HTMLElement but with the specifed type in the place of this, useful for defining custom elements */
+// export type PropsAs<T> = HTML.HTMLAttributes<T>;
+//
+// /** all the properties of a class element */
+// export type PropsOfClass<T extends abstract new (props: any) => any> = T extends abstract new (props: infer P) => any ? P : never;
 
 /** the types that can be used as a css class */
 export type Classes = HTML.ClassList;
@@ -87,11 +91,11 @@ export function css(code: string | { raw: readonly string[] | ArrayLike<string> 
 /** a special type of object which can be referenced first and initialized later, created by function `ref` */
 export type Ref<T> = T & { current: T | null };
 
-/** creates a ref, whic is a special type of object which can be referenced first and initialized later
+/** creates a ref, which is a special type of object which can be referenced first and initialized later
  *
  * you can initialize it by setting its current property
  *
- * when it is not initialized, most operations on it fail */
+ * when it is not initialized, most operations on it will throw a TypeError */
 export function ref<T extends keyof HTMLElementTagNameMap>(): Ref<HTMLElementTagNameMap[T]>;
 export function ref<T>(): Ref<T>;
 
