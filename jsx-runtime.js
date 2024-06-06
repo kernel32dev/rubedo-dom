@@ -434,7 +434,7 @@ function jsx_apply_mutation(output, mut) {
             }
             return output;
         }
-        if (mut instanceof Mutation.NestedItem) {
+        if (mut instanceof Mutation.Item) {
             output[mut.index] = jsx_apply_mutation(output[mut.index], mut.mut);
             return output;
         }
@@ -462,7 +462,7 @@ function jsx_apply_mutation(output, mut) {
             output.purge(function (_value, index) { return index in dropped; });
             return output;
         }
-        if (mut instanceof Mutation.Shuffle) {
+        if (mut instanceof Mutation.Map) {
             const last = jsx_get_last_of_output(output);
             const parent = last.parentNode;
             const lastSibling = last.nextSibling;
@@ -471,7 +471,8 @@ function jsx_apply_mutation(output, mut) {
             output.length = map.length;
             for (let i = 0; i < map.length; i++) {
                 const source = map[i];
-                const item = source !== -1 ? copy[source] : jsx_apply_total_mutation(null, mut.target[i]);
+                let item = source !== -1 ? copy[source] : jsx_apply_total_mutation(null, mut.target[i]);
+                if (i in mut.mut) item = jsx_apply_mutation(item, mut.mut[i]);
                 if (parent) jsx_insert_before_recursive(item, parent, lastSibling);
                 output[i] = item;
             }
@@ -481,15 +482,33 @@ function jsx_apply_mutation(output, mut) {
             return output;
         }
     }
-    /** @type {Mutation<unknown>} */
-    let i = mut;
-    while (i instanceof Mutation.NestedProperty || i instanceof Mutation.NestedItem) i = i.mut;
-    if (i instanceof Mutation.Nested) {
-        // ignore changes inside derived or nested inside objects into a derived
-        // this is what causes the jsx to ignore changes inside derived objects, unlike the rest of the state rules
-        return output;
-    }
+    if (jsx_is_exclusively_nested(mut)) return output;
     return jsx_apply_total_mutation(output, mut.target);
+}
+
+/** @param {Mutation<unknown>} mut @returns {boolean} */
+function jsx_is_exclusively_nested(mut) {
+    if (mut instanceof Mutation.Nested) return true;
+    if (mut instanceof Mutation.Item) return jsx_is_exclusively_nested(mut.mut);
+    if (mut instanceof Mutation.Map) {
+        if (mut.dropped_count || mut.dropped.length !== mut.map.length) return false;
+        for (const i in mut.mut) {
+            if (!jsx_is_exclusively_nested(mut.mut[i])) return false;
+        }
+        for (let i = 0; i < mut.map.length; i++) {
+            if (mut.map[i] !== i) return false;
+        }
+        return true;
+    }
+    if (mut instanceof Mutation.Object) {
+        for (const i in mut.new) return false;
+        for (const i in mut.old) return false;
+        for (const i in mut.mut) {
+            if (!jsx_is_exclusively_nested(mut.mut[i])) return false;
+        }
+        return true;
+    }
+    return false;
 }
 
 /** @param {Output} output @returns {Text} */
