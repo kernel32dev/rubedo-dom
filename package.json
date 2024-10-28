@@ -1,7 +1,7 @@
 {
     "name": "leviathan-dom",
     "version": "0.0.0",
-    "description": "A simple JSX implementation that supports the state class",
+    "description": "A simple JSX implementation that supports the use of derivations",
     "main": "index.js",
     "types": "index.d.ts",
     "files": [
@@ -22,7 +22,7 @@
         "url": "git+https://github.com/kernel32dev/leviathan-dom.git"
     },
     "keywords": [
-        "dom", "jsx", "state"
+        "dom", "jsx", "state", "html"
     ],
     "author": "kernel32dev",
     "license": "MIT",
