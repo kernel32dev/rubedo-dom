@@ -416,14 +416,15 @@ function jsx_compute_derivable_nodes(v, affector, sym_jsx) {
     if (!(v instanceof State.Array)) {
         return /** @type {DeriveableNodes[]} */ (v).map(v => jsx_compute_derivable_nodes(v, affector, sym_jsx));
     }
-    return jsx_compute_tracked_array(v); // TODO! forward affector and sym_jsx here too?
+    return jsx_compute_tracked_array(v, affector, sym_jsx);
 }
 
-/** @param {DeriveableNodes[]} v @returns {Output} */
-function jsx_compute_tracked_array(v) {
+/** @param {DeriveableNodes[]} v  @param {Function} [affector] @param {symbol} [outer_sym_jsx] @returns {Output} */
+function jsx_compute_tracked_array(v, affector, outer_sym_jsx) {
     const sym_jsx = Symbol("jsx");
     const mapped = v.$map(v => jsx_compute_derivable_nodes(v, jsx, sym_jsx));
     const output = [jsx_create_text_node("", jsx, sym_jsx)]; // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
+    if (outer_sym_jsx) jsx[outer_sym_jsx] = affector;
     Derived.affect("nothing", jsx);
     return output;
     function jsx() {
