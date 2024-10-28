@@ -16,9 +16,83 @@ const svg_tag_names = function () {
     return o;
 }();
 
+const sym_mount_count = Symbol("jsx_mount_count");
+const sym_on_mount = Symbol("jsx_on_mount");
+const sym_on_unmount = Symbol("jsx_on_unmount");
+
 export const Fragment = "";
 // jsxs is called instead of jsx when props.children is an array
 export const jsxs = jsx;
+
+if (document.body) {
+    new MutationObserver(jsx_handle_dom_mutations).observe(document.body, { childList: true, subtree: true });
+} else {
+    document.addEventListener("DOMContentLoaded", () => {
+        new MutationObserver(jsx_handle_dom_mutations).observe(document.body, { childList: true, subtree: true });
+    });
+}
+
+/** @param {MutationRecord[]} list */
+function jsx_handle_dom_mutations(list) {
+    //console.log("Mutation Observed");
+    for (const record of list) {
+        const target = record.target;
+        const removes = record.removedNodes;
+        const adds = record.addedNodes;
+        for (let i = 0; i < removes.length; i++) {
+            const remove = removes[i];
+            /** @type {number | undefined} */
+            const track_mount_count = remove[sym_mount_count];
+            if (track_mount_count) {
+                for (let i = /** @type {Node | null} */ (target); i; i = i.parentElement) {
+                    i[sym_mount_count] -= track_mount_count;
+                }
+                jsx_trigger_unmount(remove);
+            }
+            //console.log("Removed ", remove, " from ", target);
+        }
+        for (let i = 0; i < adds.length; i++) {
+            const add = adds[i];
+            /** @type {number | undefined} */
+            const track_mount_count = add[sym_mount_count];
+            if (track_mount_count) {
+                for (let i = /** @type {Node | null} */ (target); i; i = i.parentElement) {
+                    i[sym_mount_count] = (i[sym_mount_count] || 0) + track_mount_count;
+                }
+                jsx_trigger_mount(add);
+            }
+            //console.log("Added ", add, " from ", target);
+        }
+    }
+}
+
+/** @param {Node} node */
+function jsx_trigger_unmount(node) {
+    const event = node[sym_on_unmount];
+    if (event) queueMicrotask(event);
+    const children = node.childNodes;
+    const length = children.length;
+    for (let i = 0; i < length; i++) {
+        const child = children[i];
+        if (child[sym_mount_count]) {
+            jsx_trigger_unmount(child);
+        }
+    }
+}
+
+/** @param {Node} node */
+function jsx_trigger_mount(node) {
+    const event = node[sym_on_mount];
+    if (event) queueMicrotask(event);
+    const children = node.childNodes;
+    const length = children.length;
+    for (let i = 0; i < length; i++) {
+        const child = children[i];
+        if (child[sym_mount_count]) {
+            jsx_trigger_mount(child);
+        }
+    }
+}
 
 /**
  * @param {string | ((props: Props) => Elems)} tag
@@ -82,7 +156,7 @@ export function jsx(tag, props) {
     }
 }
 
-/** @param {HTMLElement | SVGElement} elem @param {Props} props  */
+/** @param {HTMLElement | SVGElement} elem newly created element @param {Props} props  */
 function jsx_apply_props(elem, props) {
     if (props === null) return;
     for (const key in props) {
@@ -145,7 +219,27 @@ function jsx_apply_props(elem, props) {
                 throw new Error("jsx: ref passed was a value of type " + typeof value);
             }
         } else if (key.startsWith("on")) {
-            elem.addEventListener(key.slice(2).toLowerCase(), value);
+            if (typeof value == "function") {
+                if (key === "onMount") {
+                    if (!(sym_on_mount in elem || sym_on_unmount in elem)) {
+                        for (let i = /** @type {Node | null} */ (elem); i; i = i.parentElement) {
+                            i[sym_mount_count] = (i[sym_mount_count] || 0) + 1;
+                        }
+                    }
+                    elem[sym_on_mount] = value.bind(elem);
+                } else if (key === "onUnmount") {
+                    if (!(sym_on_mount in elem || sym_on_unmount in elem)) {
+                        for (let i = /** @type {Node | null} */ (elem); i; i = i.parentElement) {
+                            i[sym_mount_count] = (i[sym_mount_count] || 0) + 1;
+                        }
+                    }
+                    elem[sym_on_unmount] = value.bind(elem);
+                } else {
+                    elem.addEventListener(key.slice(2).toLowerCase(), value);
+                }
+            } else if (value !== undefined) {
+                throw new Error("jsx: event attributes must be functions");
+            }
         } else {
             const name = elem instanceof SVGElement ? key : key.toLowerCase();
             Derived.affect(elem, () => {
@@ -306,7 +400,10 @@ function jsx_compute_derivable_nodes(v, affector, sym_jsx) {
         // "boolean" | "function" != 6
         return jsx_create_text_node(t.length == 6 ? "" + v : "", affector, sym_jsx);
     }
-    if (v instanceof Node) return v;
+    if (v instanceof Node) {
+        v[sym_jsx] = affector;
+        return v;
+    }
     if (is_view(v)) {
         v = v.view();
         if (!(v instanceof Node)) throw new TypeError("jsx: view method did not return a Node");
@@ -319,7 +416,7 @@ function jsx_compute_derivable_nodes(v, affector, sym_jsx) {
     if (!(v instanceof State.Array)) {
         return /** @type {DeriveableNodes[]} */ (v).map(v => jsx_compute_derivable_nodes(v, affector, sym_jsx));
     }
-    return jsx_compute_tracked_array(v); // forward affector and sym_jsx here too?
+    return jsx_compute_tracked_array(v); // TODO! forward affector and sym_jsx here too?
 }
 
 /** @param {DeriveableNodes[]} v @returns {Output} */

@@ -308,6 +308,8 @@ export namespace HTML {
     // Event System
     // ----------------------------------------------------------------------
 
+    type MountEventHandler<T> = { bivariance(this: T): void }["bivariance"];
+
     type EventHandler<T, E = Event> = { bivariance(this: T, event: E): void }["bivariance"];
 
     type ClipboardEventHandler<T = Element> = EventHandler<T, globalThis.ClipboardEvent>;
@@ -326,6 +328,10 @@ export namespace HTML {
 
     interface DOMAttributes<T> {
         children?: LEVI.Nodes;
+
+        // Mount Events
+        onMount?: MountEventHandler<T> | undefined; // TODO! update these types
+        onUnmount?: MountEventHandler<T> | undefined;
 
         // Clipboard Events
         onCopy?: ClipboardEventHandler<T> | undefined;
