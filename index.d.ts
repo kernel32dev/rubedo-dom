@@ -1,5 +1,5 @@
-export * from "levi-state";
-import type { Derived } from "levi-state";
+export * from "leviathan-state";
+import type { Derived } from "leviathan-state";
 import type { HTML, JSX } from "./html";
 
 // support for custom elements will come later
@@ -19,7 +19,7 @@ import type { HTML, JSX } from "./html";
  */
 export type Nodes = BasicNodes | Iterable<Nodes> | Derived<DeriveableNodes>;
 type DeriveableNodes = BasicNodes | DeriveableNodes[];
-type BasicNodes = Node | string | number | boolean | null | undefined | View;
+type BasicNodes = Node | string | number | bigint | boolean | null | undefined | View;
 
 /** the output of a jsx element */
 export type Elems = HTMLElement | SVGElement | DocumentFragment;
@@ -31,7 +31,7 @@ export type Elems = HTMLElement | SVGElement | DocumentFragment;
  *
  * this is how all of levi works, function components (functions that return html elements) also work this way */
 export interface View {
-    view(): Elems;
+    view(): Node;
 }
 
 /** all the properties of HTMLElement */
@@ -62,7 +62,7 @@ export type Style = HTML.CSSProperties;
  * const RedHeader = () => (
  *     <h1 class="red">Some red text</h1>
  * );
- * 
+ *
  * css`
  * .red {
  *     text: red;

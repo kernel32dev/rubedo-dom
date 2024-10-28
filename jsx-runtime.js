@@ -1,22 +1,20 @@
 //@ts-check
-import { State, Derived, Mutation } from "levi-state";
+import { State, Derived } from "leviathan-state";
 
 /** @typedef {import(".").PropsElem | import(".").PropsSVG} Props */
 /** @typedef {import(".").Nodes} Nodes */
 /** @typedef {import(".").Elems} Elems */
-/** @typedef {Nodes extends infer T | import("levi-state").Derived<infer U> ? U : never} DeriveableNodes */
+/** @typedef {Nodes extends infer T | import("leviathan-state").Derived<infer U> ? U : never} DeriveableNodes */
 
-/** @typedef {Node | OutputArray} Output */
+/** @typedef {Node | (OutputArray & {parentNode?: never})} Output */
 /** @typedef {Output[]} OutputArray */
 
 const svg_tag_names = function () {
     const l = "animate,animateMotion,animateTransform,circle,clipPath,defs,desc,ellipse,feBlend,feColorMatrix,feComponentTransfer,feComposite,feConvolveMatrix,feDiffuseLighting,feDisplacementMap,feDistantLight,feDropShadow,feFlood,feFuncA,feFuncB,feFuncG,feFuncR,feGaussianBlur,feImage,feMerge,feMergeNode,feMorphology,feOffset,fePointLight,feSpecularLighting,feSpotLight,feTile,feTurbulence,filter,foreignObject,g,image,line,linearGradient,marker,mask,metadata,mpath,path,pattern,polygon,polyline,radialGradient,rect,stop,svg,switch,symbol,text,textPath,tspan,use,view".split(',')
-    const o = { __proto__: null };
+    const o = /** @type {Record<string, true | undefined>} */ (/** @type {unknown} */ ({ __proto__: null }));
     for (let i = 0; i < l.length; i++) o[l[i]] = true;
     return o;
 }();
-
-const sym_jsx = Symbol("jsx");
 
 export const Fragment = "";
 // jsxs is called instead of jsx when props.children is an array
@@ -59,8 +57,8 @@ export function jsx(tag, props) {
         if (ref === undefined) {
             // nothing to do
         } else if (typeof ref === "object" && ref) {
-            if (ref instanceof State) {
-                /** @type {any} */
+            /*if (ref instanceof State) {
+                /** @type {any} /
                 const state_value = ref.value;
                 if (typeof state_value === "object" && state_value !== null && typeof state_value.current === "object") {
                     state_value.current = elem;
@@ -68,7 +66,7 @@ export function jsx(tag, props) {
                 } else {
                     ref.value = elem;
                 }
-            } else if (typeof ref.current === "object") {
+            } else */if (typeof ref.current === "object") {
                 ref.current = /** @type {HTMLElement | SVGElement} */ (elem);
             } else {
                 throw new Error("jsx: ref passed was an object that is not a State nor a Ref");
@@ -104,119 +102,33 @@ function jsx_apply_props(elem, props) {
         if (key === "value" && value instanceof Derived && (elem instanceof HTMLInputElement || elem instanceof HTMLTextAreaElement)) {
             if (value instanceof State) {
                 elem.addEventListener("input", function () {
-                    value.value = this.value;
+                    value.set(this.value);
                 });
             } else if (!("disabled" in props)) {
                 elem.disabled = true;
             }
-            value.do((/** @type {any} */ x) => {
-                x = "" + x;
+            Derived.affect(elem, () => {
+                const x = "" + value();
                 if (x !== elem.value) elem.value = x;
             });
         } else if (key === "checked" && value instanceof Derived && elem instanceof HTMLInputElement) {
             if (value instanceof State) {
                 elem.addEventListener("input", function () {
                     if (this.type !== "checkbox" && this.type !== "radio") return;
-                    value.value = !!this.checked;
+                    value.set(!!this.checked);
                 });
             } else if (!("disabled" in props)) {
                 elem.disabled = true;
             }
-            value.do((/** @type {any} */ x) => {
-                x = !!x;
+            Derived.affect(elem, () => {
+                const x = !!value();
                 if (x !== elem.checked) elem.checked = x;
-            });
-        } else if (key === "value" && value instanceof Derived && elem instanceof HTMLSelectElement) {
-            if (value instanceof State) {
-                elem.addEventListener("input", function () {
-                    // read from options, write to state
-                    if (!this.multiple) {
-                        // if this select is not
-                        value.value = this.value;
-                        return;
-                    }
-                    // get the stateful array from the state, if it is not an array, assign it one
-                    if (!Array.isArray(value.value)) value.value = [];
-                    // this the array that needs to have its items updated
-                    /** @type {any} */
-                    const output = value.value;
-
-                    // this is the array of options from which we must read
-                    // create a multi map to calculate the differences
-
-                    //@ts-expect-error
-                    const map = /** @type {Record<string, number>} */ ({ __proto__: null });
-
-                    // subtract for each item in the original array
-                    for (let i = 0; i < output.length; i++) {
-                        const key = output[i];
-                        if (typeof key !== "string" && typeof key !== "number") continue;
-                        map[key] = (map[key] || 0) - 1;
-                    }
-
-                    // increment for each item in the selected options
-                    const options = elem.options;
-                    for (let i = 0; i < options.length; i++) {
-                        const option = options[i];
-                        if (!option.selected) continue;
-                        const key = option.value;
-                        map[key] = (map[key] || 0) + 1;
-                    }
-
-                    // remove the removed
-                    for (const key in map) {
-                        if (map[key] < 0) {
-                            let index = 0;
-                            while (true) {
-                                index = output.indexOf(key, index);
-                                if (index === -1) break;
-                                output.splice(index, 1);
-                            }
-                        }
-                    }
-
-                    // add the added
-                    for (const key in map) {
-                        if (map[key] > 0) output.push(key);
-                    }
-                });
-            } else if (!("disabled" in props)) {
-                elem.disabled = true;
-            }
-            value.do(x => {
-                // read from state, write to options
-                if (elem.multiple) {
-                    const options = elem.options;
-                    if (Array.isArray(x)) {
-                        for (let i = 0; i < options.length; i++) {
-                            const option = options[i];
-                            option.selected = x.indexOf(option.value) != -1;
-                        }
-                    } else if (typeof x === "string" || typeof x === "number") {
-                        x = "" + x;
-                        for (let i = 0; i < options.length; i++) {
-                            let option = options[i];
-                            option.selected = x === option.value;
-                        }
-                    } else {
-                        for (let i = 0; i < options.length; i++) {
-                            options[i].selected = false;
-                        }
-                    }
-                } else {
-                    if (typeof x === "string" || typeof x === "number") {
-                        elem.value = "" + x;
-                    } else {
-                        elem.value = "";
-                    }
-                }
             });
         } else if (key === "ref") {
             if (typeof value === "function") {
                 value.call(elem, elem);
             } else if (typeof value === "object") {
-                if (value instanceof State) {
-                    /** @type {any} */
+                /*if (value instanceof State) {
                     const state_value = value.value;
                     if (typeof state_value === "object" && state_value !== null && typeof state_value.current === "object") {
                         state_value.current = elem;
@@ -224,7 +136,7 @@ function jsx_apply_props(elem, props) {
                     } else {
                         value.value = elem;
                     }
-                } else if (typeof value.current === "object") {
+                } else */if (typeof value.current === "object") {
                     value.current = elem;
                 } else {
                     throw new Error("jsx: ref passed was an object that is not a State nor a Ref");
@@ -236,27 +148,28 @@ function jsx_apply_props(elem, props) {
             elem.addEventListener(key.slice(2).toLowerCase(), value);
         } else {
             const name = elem instanceof SVGElement ? key : key.toLowerCase();
-            Derived.do(value, value => {
-                if (typeof value === "string" || typeof value === "number" || typeof value === "bigint") {
-                    elem.setAttribute(name, "" + value);
-                } else if (typeof value === "function") {
+            Derived.affect(elem, () => {
+                const v = Derived.use(value);
+                if (typeof v === "string" || typeof v === "number" || typeof v === "bigint") {
+                    elem.setAttribute(name, "" + v);
+                } else if (typeof v === "function") {
                     throw new Error("jsx: unsupported function attribute " + name);
-                } else if (typeof value === "boolean") {
-                    if (value) {
+                } else if (typeof v === "boolean") {
+                    if (v) {
                         elem.setAttribute(name, "");
                     } else {
                         elem.removeAttribute(name);
                     }
-                } else if (typeof value === "undefined") {
+                } else if (typeof v === "undefined") {
                     elem.removeAttribute(name);
-                } else if (typeof value === "object") {
-                    if (value === null) {
+                } else if (typeof v === "object") {
+                    if (v === null) {
                         elem.removeAttribute(name);
                     } else if (name === "style") {
                         elem.style.cssText = "";
-                        for (const key in value) {
+                        for (const key in v) {
                             const kebab = key.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
-                            elem.style.setProperty(kebab, "" + value[key]);
+                            elem.style.setProperty(kebab, "" + v[key]);
                         }
                     } else {
                         throw new Error("jsx: unsupported object attribute " + name);
@@ -282,21 +195,24 @@ function jsx_apply_class(tokens, prop) {
     } else if (prop instanceof Derived) {
         //@ts-expect-error
         const bucket = /** @type {Record<string, boolean | undefined>} */ ({ __proto__: null });
-        jsx_apply_stateless_class(tokens, prop.value, bucket);
-        prop.on(prop => {
+        Derived.affect(tokens, () => {
+            const v = prop();
             for (const key in bucket) {
-                tokens.remove(key);
-                bucket[key] = false;
+                if (bucket[key]) {
+                    tokens.remove(key);
+                    bucket[key] = false;
+                }
             }
-            jsx_apply_stateless_class(tokens, prop, bucket);
+            jsx_apply_stateless_class(tokens, v, bucket);
         });
     } else {
         for (const key in prop) {
             const item = prop[key];
             if (!item) continue;
             if (item instanceof Derived) {
-                if (item.value) tokens.add(key);
-                item.on(x => tokens.toggle(key, !!x));
+                Derived.affect(tokens, () => {
+                    tokens.toggle(key, !!item());
+                });
             } else {
                 tokens.add(key);
             }
@@ -337,31 +253,32 @@ function jsx_apply_stateless_class(list, prop, bucket) {
 /**
  * @param {Node} elem
  * @param {Nodes} child
- * @param {Symbol} [state_sym_context]
  */
-function jsx_apply_children(elem, child, state_sym_context) {
-    if (child === null || child === undefined || typeof child === "boolean") {
+function jsx_apply_children(elem, child) {
+    if (child === null || child === undefined || child === "" || typeof child === "boolean") {
         // ignore boolean, undefined and null
         // this exists to allow things like `<div>{is_checked && <span>checked!</span>}</div>` to exist
+    } else if (child instanceof Derived) {
+        jsx_apply_stateful_children(elem, child);
     } else if (typeof child !== "object") {
         child = document.createTextNode("" + child);
         elem.appendChild(child);
-    } else if (child instanceof Derived) {
-        jsx_apply_stateful_children(elem, child);
     } else if ("view" in child) {
         child = child["view"]();
         elem.appendChild(child);
     } else if (child instanceof Node) {
         elem.appendChild(child);
-    } else if (Symbol.iterator in child) {
-        if (Array.isArray(child)) {
-            for (let i = 0; i < child.length; i++) {
-                jsx_apply_children(elem, child[i], state_sym_context);
-            }
+    } else if (Array.isArray(child)) {
+        if (child instanceof State.Array) {
+            jsx_append_output(jsx_compute_tracked_array(child), elem, null);
         } else {
-            for (let i of child) {
-                jsx_apply_children(elem, i, state_sym_context);
+            for (let i = 0; i < /** @type {Array<Nodes>} */ (child).length; i++) {
+                jsx_apply_children(elem, /** @type {Array<Nodes>} */ (child)[i]);
             }
+        }
+    } else if (Symbol.iterator in child) {
+        for (let i of child) {
+            jsx_apply_children(elem, i);
         }
     } else {
         console.error("not a valid jsx node: ", child);
@@ -371,257 +288,114 @@ function jsx_apply_children(elem, child, state_sym_context) {
 
 /** @param {Node} elem @param {Derived<DeriveableNodes>} state */
 function jsx_apply_stateful_children(elem, state) {
-    if (sym_jsx in state) {
-        if (jsx_get_parent_recursive(/** @type {Output} */(state[sym_jsx])) !== elem) {
-            jsx_append_child_recursive(elem, /** @type {Output} */(state[sym_jsx]));
-        }
-    } else {
-        const output = jsx_apply_total_mutation(null, state.value);
-        Object.defineProperty(state, sym_jsx, {
-            configurable: true, enumerable: false, writable: true, value: output
+    const sym_jsx = Symbol("jsx");
+    /** @type {Output} */
+    let output = elem.appendChild(jsx_create_text_node("", jsx, sym_jsx)); // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
+    Derived.affect("nothing", jsx);
+    function jsx() {
+        output = jsx_replace_output(output, jsx_compute_derivable_nodes(state(), jsx, sym_jsx), sym_jsx);
+    }
+}
+
+/** @param {DeriveableNodes} v @param {Function} affector @param {symbol} sym_jsx @returns {Output} */
+function jsx_compute_derivable_nodes(v, affector, sym_jsx) {
+    if (!v || typeof v != "object") {
+        const t = typeof v;
+        if (t === "symbol") throw new TypeError("jsx: symbol cannot be rendered");
+        // "string" | "number" | "bigint" == 6
+        // "boolean" | "function" != 6
+        return jsx_create_text_node(t.length == 6 ? "" + v : "", affector, sym_jsx);
+    }
+    if (v instanceof Node) return v;
+    if (is_view(v)) {
+        v = v.view();
+        if (!(v instanceof Node)) throw new TypeError("jsx: view method did not return a Node");
+        v[sym_jsx] = affector;
+        return v;
+    }
+    if (!Array.isArray(v)) {
+        throw new TypeError("jsx: invalid object returned by derivation, not a Node, View or Array");
+    }
+    if (!(v instanceof State.Array)) {
+        return /** @type {DeriveableNodes[]} */ (v).map(v => jsx_compute_derivable_nodes(v, affector, sym_jsx));
+    }
+    return jsx_compute_tracked_array(v); // forward affector and sym_jsx here too?
+}
+
+/** @param {DeriveableNodes[]} v @returns {Output} */
+function jsx_compute_tracked_array(v) {
+    const sym_jsx = Symbol("jsx");
+    const mapped = v.$map(v => jsx_compute_derivable_nodes(v, jsx, sym_jsx));
+    const output = [jsx_create_text_node("", jsx, sym_jsx)]; // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
+    Derived.affect("nothing", jsx);
+    return output;
+    function jsx() {
+        State.Array.use(mapped);
+        Derived.now(() => {
+            const new_output = Array.from(mapped);
+            if (new_output.length == 0) new_output[0] = jsx_create_text_node("", jsx, sym_jsx);
+            jsx_replace_output(output, new_output, sym_jsx);
+            output.length = 0;
+            output.push.apply(output, new_output);
         });
-        jsx_append_child_recursive(elem, output);
-        state.on(jsx_mutation_handler);
     }
 }
 
-/**
- * @this {Derived<DeriveableNodes>}
- * @param {DeriveableNodes} _
- * @param {Mutation.Of<DeriveableNodes>} mut
- */
-function jsx_mutation_handler(_, mut) {
-    this[sym_jsx] = jsx_apply_mutation(/** @type {Output} */(this[sym_jsx]), mut);
+/** @param {string} v @param {Function} affector @param {symbol} sym_jsx  @returns {Text} */
+function jsx_create_text_node(v, affector, sym_jsx) {
+    const text = document.createTextNode(v);
+    /** @type {any} */ (text)[sym_jsx] = affector;
+    return text;
 }
 
-/**
- * @param {Output} output
- * @param {Mutation.Of<DeriveableNodes | DeriveableNodes[]>} mut
- * @returns {Output}
- */
-function jsx_apply_mutation(output, mut) {
-    if (Array.isArray(output) && Array.isArray(mut.target)) {
-        if (mut instanceof Mutation.Splice) {
-            if (mut.insert_length === 0) {
-                const remove_length = mut.removed ? mut.removed.length : 0;
-                if (mut.index === 0 && remove_length === output.length) {
-                    return jsx_apply_clear(output);
-                } else {
-                    jsx_remove_recursive(output.splice(mut.index, remove_length));
-                    return output;
-                }
-            }
-            const remove_length = mut.removed ? mut.removed.length : 0;
-            const inserted = /** @type {OutputArray} */ (jsx_apply_total_mutation(null, mut.target.slice(mut.index, mut.index + mut.insert_length)));
-            if (!Array.isArray(inserted)) debugger;
-            if (inserted.length !== mut.insert_length) debugger;
-            if (remove_length) {
-                const removed = output.splice(mut.index, remove_length, ...inserted);
-                const last = jsx_get_last_of_output(removed);
-                const parent = last.parentNode;
-                if (parent) jsx_insert_before_recursive(inserted, parent, last.nextSibling);
-                jsx_remove_recursive(removed);
-            } else if (mut.index) {
-                const last = jsx_get_last_of_output(output[mut.index - 1]);
-                output.splice(mut.index, 0, ...inserted);
-                const parent = last.parentNode;
-                if (parent) jsx_insert_before_recursive(inserted, parent, last.nextSibling);
-            } else {
-                const last = jsx_get_last_of_output(output[0]);
-                output.unshift(...inserted);
-                const parent = last.parentNode;
-                if (parent) jsx_insert_before_recursive(inserted, parent, last);
-            }
-            return output;
-        }
-        if (mut instanceof Mutation.Item) {
-            output[mut.index] = jsx_apply_mutation(output[mut.index], mut.mut);
-            return output;
-        }
-        if (mut instanceof Mutation.Move) {
-            if (output.length !== mut.target.length) debugger;
-            const from = mut.from;
-            const to = mut.to;
-            const length = mut.length;
-            const last = jsx_get_last_of_output(output[to && to - 1]);
-            const parent = last.parentNode;
-            const moved = output.slice(from, from + length);
-            if (parent) jsx_insert_before_recursive(moved, parent, to ? last.nextSibling : last);
-            output.move(from, to, length);
-            return output;
-        }
-        if (mut instanceof Mutation.Purge) {
-            if (output.length === mut.dropped_count) {
-                return jsx_apply_clear(output);
-            }
-            const dropped = mut.dropped;
-            if (output.length !== dropped.length) debugger;
-            for (const key in dropped) {
-                jsx_remove_recursive(output[key]);
-            }
-            output.purge(function (_value, index) { return index in dropped; });
-            return output;
-        }
-        if (mut instanceof Mutation.Map) {
-            const last = jsx_get_last_of_output(output);
-            const parent = last.parentNode;
-            const lastSibling = last.nextSibling;
-            const map = mut.map;
-            const copy = Array.from(output);
-            output.length = map.length;
-            for (let i = 0; i < map.length; i++) {
-                const source = map[i];
-                let item = source !== -1 ? copy[source] : jsx_apply_total_mutation(null, mut.target[i]);
-                if (i in mut.mut) item = jsx_apply_mutation(item, mut.mut[i]);
-                if (parent) jsx_insert_before_recursive(item, parent, lastSibling);
-                output[i] = item;
-            }
-            for (const i in mut.dropped) {
-                jsx_remove_recursive(copy[i]);
-            }
-            return output;
-        }
-    }
-    if (jsx_is_exclusively_nested(mut)) return output;
-    return jsx_apply_total_mutation(output, mut.target);
+/** @param {any} arg @returns {arg is {view(): unknown}} TODO! inline this */
+function is_view(arg) {
+    return typeof arg.view == "function";
 }
 
-/** @param {Mutation<unknown>} mut @returns {boolean} */
-function jsx_is_exclusively_nested(mut) {
-    if (mut instanceof Mutation.Nested) return true;
-    if (mut instanceof Mutation.Item) return jsx_is_exclusively_nested(mut.mut);
-    if (mut instanceof Mutation.Map) {
-        if (mut.dropped_count || mut.dropped.length !== mut.map.length) return false;
-        for (const i in mut.mut) {
-            if (!jsx_is_exclusively_nested(mut.mut[i])) return false;
-        }
-        for (let i = 0; i < mut.map.length; i++) {
-            if (mut.map[i] !== i) return false;
-        }
-        return true;
+/** @param {Output} old_output @param {Output} new_output @param {symbol} sym_jsx @returns {Output} */
+function jsx_replace_output(old_output, new_output, sym_jsx) {
+    // 0. special common case, if it is just text changing, don't swap the nodes
+    if (old_output instanceof Text && new_output instanceof Text) {
+        old_output.nodeValue = new_output.nodeValue;
+        return old_output;
     }
-    if (mut instanceof Mutation.Object) {
-        for (const i in mut.new) return false;
-        for (const i in mut.old) return false;
-        for (const i in mut.mut) {
-            if (!jsx_is_exclusively_nested(mut.mut[i])) return false;
-        }
-        return true;
-    }
-    return false;
-}
-
-/** @param {Output} output @returns {Text} */
-function jsx_apply_clear(output) {
-    const last = jsx_get_last_of_output(output);
+    // 1. get the last element of old_output
+    const last = jsx_last_output(old_output);
     const parent = last.parentNode;
-    const new_output = document.createTextNode("");
-    if (parent) parent.insertBefore(new_output, last.nextSibling);
-    jsx_remove_recursive(output);
+    if (!parent) return new_output;
+    const child = last.nextSibling;
+    // 2. remove old_output
+    jsx_remove_output(old_output, sym_jsx);
+    jsx_append_output(new_output, parent, child);
     return new_output;
 }
 
-/** @param {Output | null} output  @param {DeriveableNodes} child @returns {Output} */
-function jsx_apply_total_mutation(output, child) {
-    if (!child || typeof child !== "object") {
-        const text = /** @type {string} */ (typeof child === "string" || typeof child === "number" ? "" + child : "");
-        if (output instanceof Text) {
-            output.nodeValue = text;
-            return output;
-        }
-        child = document.createTextNode(text);
-        if (output) {
-            jsx_insert_node_after_last(child, output);
-            jsx_remove_recursive(output);
-        }
-        return child;
-    }
-    if ("view" in child) child = child.view();
-    if (child instanceof Node) {
-        if (output === child) return output;
-        if (child instanceof DocumentFragment) {
-            child = Array.from(child.children);
-        } else {
-            if (output) {
-                jsx_insert_node_after_last(child, output);
-                jsx_remove_recursive(output);
-            }
-            return child;
-        }
-    }
-    if (!(Symbol.iterator in child)) {
-        console.error("not a valid stateless jsx node: ", child);
-        throw new Error("not a valid stateless jsx node: " + child);
-    }
-    const new_output = [];
-    const destination = output && jsx_get_last_of_output(output);
-    const destination_parent = destination && destination.parentNode;
-    const destination_child = destination && destination.nextSibling;
-    if (output) jsx_remove_recursive(output);
-    if (destination_parent) {
-        for (const i of child) {
-            const node = jsx_apply_total_mutation(null, i);
-            jsx_insert_before_recursive(node, destination_parent, destination_child);
-            new_output.push(node);
-        }
-        if (new_output.length) return new_output;
-        child = document.createTextNode("");
-        if (output) destination_parent.insertBefore(child, destination_child)
-        return child;
-    } else {
-        for (const i of child) {
-            new_output.push(jsx_apply_total_mutation(null, i));
-        }
-        if (new_output.length) return new_output;
-        return document.createTextNode("");
-    }
-}
-
-/** @param {Output} output */
-function jsx_get_last_of_output(output) {
+/** @param {Output} output @returns {Node} */
+function jsx_last_output(output) {
     while (Array.isArray(output)) output = output[output.length - 1];
     return output;
 }
-/** @param {Output} output @returns {ParentNode | null} */
-function jsx_get_parent_recursive(output) {
-    while (Array.isArray(output)) output = output[0];
-    return output.parentNode;
-}
-/** @param {Node} elem @param {Output} output */
-function jsx_append_child_recursive(elem, output) {
-    if (!Array.isArray(output)) {
-        elem.appendChild(output);
-    } else {
+
+/** @param {Output} output @param {symbol} sym_jsx  */
+function jsx_remove_output(output, sym_jsx) {
+    if (Array.isArray(output)) {
         for (let i = 0; i < output.length; i++) {
-            jsx_append_child_recursive(elem, output[i]);
+            jsx_remove_output(output[i], sym_jsx);
         }
+    } else {
+        if (output.parentNode) output.parentNode.removeChild(output);
+        delete output[sym_jsx];
     }
-}
-/** @param {Node} elem @param {Output} output */
-function jsx_insert_node_after_last(elem, output) {
-    while (Array.isArray(output)) output = output[output.length - 1];
-    const parent = output.parentNode;
-    if (parent) parent.insertBefore(elem, output.nextSibling);
 }
 
-/** @param {Output} output */
-function jsx_remove_recursive(output) {
-    if (!Array.isArray(output)) {
-        const parent = output.parentNode;
-        if (parent) parent.removeChild(output);
-    } else {
+/** @param {Output} output @param {Node} parent @param {Node | null} child second parameter */
+function jsx_append_output(output, parent, child) {
+    if (Array.isArray(output)) {
         for (let i = 0; i < output.length; i++) {
-            jsx_remove_recursive(output[i]);
+            jsx_append_output(output[i], parent, child);
         }
-    }
-}
-/** @param {Output} output @param {Node} beforeParent @param {Node | null} beforeChild */
-function jsx_insert_before_recursive(output, beforeParent, beforeChild) {
-    if (!Array.isArray(output)) {
-        beforeParent.insertBefore(output, beforeChild);
     } else {
-        for (let i = 0; i < output.length; i++) {
-            jsx_insert_before_recursive(output[i], beforeParent, beforeChild);
-        }
+        if (parent) parent.insertBefore(output, child);
     }
 }

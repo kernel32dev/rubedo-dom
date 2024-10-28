@@ -1,4 +1,4 @@
-export * from "levi-state";
+export * from "leviathan-state";
 
 // support for custom elements will come later
 //
@@ -30,15 +30,16 @@ export function css(code) {
 // #region Ref
 
 export function ref() {
-    return new Proxy({ __proto__: null }, ref_proxy);
+    return new Proxy({ __proto__: null, current: null }, ref_proxy);
 }
 
 function unwrap_ref(target) {
-    if (ref_symbol in target) return target[ref_symbol];
+    const current = target.current;
+    if (current) return current;
     throw new Error("Ref is not yet initialized");
 }
 
-const ref_symbol = Symbol("ref.current");
+/** @type {ProxyHandler<{current: null | object}>} */
 const ref_proxy = {
     apply(target, thisArg, argArray) {
         return Reflect.apply(unwrap_ref(target), thisArg, argArray);
@@ -51,23 +52,31 @@ const ref_proxy = {
         return Reflect.defineProperty(unwrap_ref(target), property, attributes);
     },
     deleteProperty(target, p) {
-        if (p === "current") return delete target[ref_symbol];
+        if (p === "current") return false;
         return Reflect.deleteProperty(unwrap_ref(target), p);
     },
-    get(target, p, _receiver) {
-        if (p === "current") return ref_symbol in target ? target[ref_symbol] : null;
-        const current = unwrap_ref(target);
+    get(target, p) {
+        const current = target.current;
+        if (p === "current") return current;
+        if (!current) unwrap_ref(target);
         const value = Reflect.get(current, p, current);
-        return typeof value === "function" ? value.bind(current) : value;
+        return typeof value == "function" ? value.bind(current) : value;
     },
     getOwnPropertyDescriptor(target, p) {
+        if (p === "current") return {
+            value: target.current,
+            writable: true,
+            enumerable: false,
+            configurable: false,
+        };
         return Reflect.getOwnPropertyDescriptor(unwrap_ref(target), p);
     },
     getPrototypeOf(target) {
-        if (!(ref_symbol in target)) return null;
-        return Reflect.getPrototypeOf(target[ref_symbol]);
+        const current = target.current;
+        return current && Reflect.getPrototypeOf(current);
     },
     has(target, p) {
+        if (p === "current") return true;
         return Reflect.has(unwrap_ref(target), p);
     },
     isExtensible(target) {
@@ -79,17 +88,13 @@ const ref_proxy = {
     preventExtensions(target) {
         return Reflect.preventExtensions(unwrap_ref(target));
     },
-    set(target, p, newValue, _receiver) {
+    set(target, p, newValue) {
         if (p === "current") {
-            if (newValue === null) {
-                delete target[ref_symbol];
-                return true;
-            } else if (typeof newValue == "object") {
-                target[ref_symbol] = newValue;
-                return true;
-            } else {
+            if (typeof newValue != "object") {
                 throw new Error("Ref can only be initialized to an object or null");
             }
+            target.current = newValue;
+            return true;
         }
         const current = unwrap_ref(target);
         return Reflect.set(current, p, newValue, current);

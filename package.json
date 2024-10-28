@@ -1,5 +1,5 @@
 {
-    "name": "levi-dom",
+    "name": "leviathan-dom",
     "version": "0.0.0",
     "description": "A simple JSX implementation that supports the state class",
     "main": "index.js",
@@ -17,7 +17,7 @@
     "scripts": {},
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/kernel32dev/levi-dom.git"
+        "url": "git+https://github.com/kernel32dev/leviathan-dom.git"
     },
     "keywords": [
         "dom", "jsx", "state"
@@ -25,6 +25,6 @@
     "author": "kernel32dev",
     "license": "MIT",
     "dependencies": {
-        "levi-state": "0.0.0"
+        "leviathan-state": "file:../leviathan-state"
     }
 }

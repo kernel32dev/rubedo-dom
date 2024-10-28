@@ -22,9 +22,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 // the license above refers to the code in this file that is from the React library
-// declarations for JSX taken from React and adaptated to better represent standard html and to work with levi
+// declarations for JSX taken from React and adaptated to better represent standard html and to work with leviathan
 // in the future it would be interesting to generate the code in this file from the spec directly, but until then this will do
-import type { Derived, State } from "levi-state";
+import type { Derived, State } from "leviathan-state";
 import type * as CSS from "./css";
 import type * as LEVI from ".";
 
