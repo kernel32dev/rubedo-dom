@@ -1,4 +1,5 @@
 export * from "leviathan-state";
+export * from "./effects";
 
 // support for custom elements will come later
 //

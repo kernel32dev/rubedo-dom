@@ -1,4 +1,5 @@
 export * from "leviathan-state";
+export * from "./effects";
 import type { Derived } from "leviathan-state";
 import type { HTML, JSX } from "./html";
 
