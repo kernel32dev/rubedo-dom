@@ -97,8 +97,9 @@ export type Ref<T> = T & { current: T | null };
  * you can initialize it by setting its current property
  *
  * when it is not initialized, most operations on it will throw a TypeError */
+export function ref<T extends object>(): Ref<T>;
 export function ref<T extends keyof HTMLElementTagNameMap>(): Ref<HTMLElementTagNameMap[T]>;
-export function ref<T>(): Ref<T>;
+export function ref<T extends keyof SVGElementTagNameMap>(): Ref<SVGElementTagNameMap[T]>;
 
 // #region Globals
 
