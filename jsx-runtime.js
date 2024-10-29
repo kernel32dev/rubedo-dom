@@ -126,7 +126,11 @@ export function jsx(tag, props) {
         }
     }
     if (typeof tag === "string") {
-        if (tag === "") return document.createDocumentFragment();
+        if (!tag) {
+            const elem = document.createDocumentFragment();
+            jsx_apply_children(elem, props.children);
+            return elem;
+        }
         const elem = !svg_tag_names[tag] ? document.createElement(tag) : document.createElementNS("http://www.w3.org/2000/svg", tag);
         jsx_apply_props(elem, props);
         return elem;
@@ -171,6 +175,9 @@ export function jsx(tag, props) {
 /** @param {HTMLElement | SVGElement} elem newly created element @param {Props} props  */
 function jsx_apply_props(elem, props) {
     if (props === null) return;
+    if (elem instanceof DocumentFragment) {
+        debugger;
+    }
     for (const key in props) {
         if (key === "__source") {
             // let source = (props as any)["__source"] as { fileName: string, lineNumber: number, columnNumber: number };
