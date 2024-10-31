@@ -423,13 +423,13 @@ function jsx_apply_stateful_children(elem, state) {
 
 /** @param {DeriveableNodes} v @param {Function} affector @param {symbol} sym_jsx @returns {Output} */
 function jsx_compute_derivable_nodes(v, affector, sym_jsx) {
-    if (!v || typeof v != "object") {
-        const t = typeof v;
-        if (t === "symbol") throw new TypeError("jsx: symbol cannot be rendered");
+    if (typeof v != "object") {
+        if (typeof v === "symbol") throw new TypeError("jsx: symbol cannot be rendered");
         // "string" | "number" | "bigint" == 6
-        // "boolean" | "function" != 6
-        return jsx_create_text_node(t.length == 6 ? "" + v : "", affector, sym_jsx);
+        // "boolean" | "function" | "undefined" != 6
+        return jsx_create_text_node((typeof v).length == 6 ? "" + v : "", affector, sym_jsx);
     }
+    if (!v) return jsx_create_text_node("", affector, sym_jsx);
     if (v instanceof Node) {
         v[sym_jsx] = affector;
         return v;
