@@ -1,5 +1,5 @@
 //@ts-check
-import { State, Derived } from "leviathan-state";
+import { State, Derived, Effect } from "leviathan-state";
 
 /** @typedef {import(".").PropsElem | import(".").PropsSVG} Props */
 /** @typedef {import(".").Nodes} Nodes */
@@ -200,7 +200,7 @@ function jsx_apply_props(elem, props) {
             } else if (!("disabled" in props)) {
                 elem.disabled = true;
             }
-            Derived.affect(elem, () => {
+            new Effect(elem, () => {
                 const x = "" + value();
                 if (x !== elem.value) elem.value = x;
             });
@@ -213,7 +213,7 @@ function jsx_apply_props(elem, props) {
             } else if (!("disabled" in props)) {
                 elem.disabled = true;
             }
-            Derived.affect(elem, () => {
+            new Effect(elem, () => {
                 const x = !!value();
                 if (x !== elem.checked) elem.checked = x;
             });
@@ -272,7 +272,7 @@ function jsx_apply_props(elem, props) {
             }
         } else {
             const name = elem instanceof SVGElement ? key : key.toLowerCase();
-            Derived.affect(elem, () => {
+            new Effect(elem, () => {
                 const v = Derived.use(value);
                 if (typeof v === "string" || typeof v === "number" || typeof v === "bigint") {
                     elem.setAttribute(name, "" + v);
@@ -319,7 +319,7 @@ function jsx_apply_class(tokens, prop) {
     } else if (prop instanceof Derived) {
         //@ts-expect-error
         const bucket = /** @type {Record<string, boolean | undefined>} */ ({ __proto__: null });
-        Derived.affect(tokens, () => {
+        new Effect(tokens, () => {
             const v = prop();
             for (const key in bucket) {
                 if (bucket[key]) {
@@ -334,7 +334,7 @@ function jsx_apply_class(tokens, prop) {
             const item = prop[key];
             if (!item) continue;
             if (item instanceof Derived) {
-                Derived.affect(tokens, () => {
+                new Effect(tokens, () => {
                     tokens.toggle(key, !!item());
                 });
             } else {
@@ -413,15 +413,15 @@ function jsx_apply_children(elem, child) {
 /** @param {Node} elem @param {Derived<DeriveableNodes>} state */
 function jsx_apply_stateful_children(elem, state) {
     const sym_jsx = Symbol("jsx");
+    const affector = new Effect.Weak(jsx);
     /** @type {Output} */
-    let output = elem.appendChild(jsx_create_text_node("", jsx, sym_jsx)); // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
-    Derived.affect("nothing", jsx);
+    let output = elem.appendChild(jsx_create_text_node("", affector, sym_jsx)); // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
     function jsx() {
-        output = jsx_replace_output(output, jsx_compute_derivable_nodes(state(), jsx, sym_jsx), sym_jsx);
+        output = jsx_replace_output(output, jsx_compute_derivable_nodes(state(), affector, sym_jsx), sym_jsx);
     }
 }
 
-/** @param {DeriveableNodes} v @param {Function} affector @param {symbol} sym_jsx @returns {Output} */
+/** @param {DeriveableNodes} v @param {Effect} affector @param {symbol} sym_jsx @returns {Output} */
 function jsx_compute_derivable_nodes(v, affector, sym_jsx) {
     if (typeof v != "object") {
         if (typeof v === "symbol") throw new TypeError("jsx: symbol cannot be rendered");
@@ -440,6 +440,7 @@ function jsx_compute_derivable_nodes(v, affector, sym_jsx) {
         v[sym_jsx] = affector;
         return v;
     }
+    // TODO! handle iterable
     if (!Array.isArray(v)) {
         throw new TypeError("jsx: invalid object returned by derivation, not a Node, View or Array");
     }
@@ -449,19 +450,19 @@ function jsx_compute_derivable_nodes(v, affector, sym_jsx) {
     return jsx_compute_tracked_array(v, affector, sym_jsx);
 }
 
-/** @param {DeriveableNodes[]} v  @param {Function} [affector] @param {symbol} [outer_sym_jsx] @returns {Output} */
-function jsx_compute_tracked_array(v, affector, outer_sym_jsx) {
+/** @param {DeriveableNodes[]} v  @param {Effect} [outer_affector] @param {symbol} [outer_sym_jsx] @returns {Output} */
+function jsx_compute_tracked_array(v, outer_affector, outer_sym_jsx) {
+    const affector = new Effect.Weak(jsx);
     const sym_jsx = Symbol("jsx");
-    const mapped = v.$map(v => jsx_compute_derivable_nodes(v, jsx, sym_jsx));
-    const output = [jsx_create_text_node("", jsx, sym_jsx)]; // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
-    if (outer_sym_jsx) jsx[outer_sym_jsx] = affector;
-    Derived.affect("nothing", jsx);
+    const mapped = v.$map(v => jsx_compute_derivable_nodes(v, affector, sym_jsx));
+    const output = [jsx_create_text_node("", affector, sym_jsx)]; // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
+    if (outer_sym_jsx) jsx[outer_sym_jsx] = outer_affector;
     return output;
     function jsx() {
         State.Array.use(mapped);
         Derived.now(() => {
             const new_output = Array.from(mapped);
-            if (new_output.length == 0) new_output[0] = jsx_create_text_node("", jsx, sym_jsx);
+            if (new_output.length == 0) new_output[0] = jsx_create_text_node("", affector, sym_jsx);
             jsx_replace_output(output, new_output, sym_jsx);
             output.length = 0;
             output.push.apply(output, new_output);
@@ -469,7 +470,7 @@ function jsx_compute_tracked_array(v, affector, outer_sym_jsx) {
     }
 }
 
-/** @param {string} v @param {Function} affector @param {symbol} sym_jsx  @returns {Text} */
+/** @param {string} v @param {Effect} affector @param {symbol} sym_jsx  @returns {Text} */
 function jsx_create_text_node(v, affector, sym_jsx) {
     const text = document.createTextNode(v);
     /** @type {any} */ (text)[sym_jsx] = affector;

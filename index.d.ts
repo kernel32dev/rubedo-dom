@@ -9,13 +9,13 @@ import type { HTML, JSX } from "./html";
 //     constructor();
 // }
 
-/** the inputs to a jsx element
- * consists of:
- * 1. string and number (render text nodes)
+/** the inputs to a jsx element, consists of:
+ *
+ * 1. string, number and bigint (render text nodes)
  * 2. undefined, null and boolean (render nothing)
  * 3. Node (added to the tree)
  * 4. View (the view method is called)
- * 5. Iterable (iterated and added)
+ * 5. Iterable (iterated and each item is added)
  * 6. Derived (will be updated automatically)
  */
 export type Nodes = BasicNodes | Iterable<Nodes> | Derived<DeriveableNodes>;
