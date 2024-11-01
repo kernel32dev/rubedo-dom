@@ -1,13 +1,9 @@
 export * from "leviathan-state";
-export * from "./effects";
+export * from "./ref";
+export * from "./scope";
+export * from "./signal";
 import type { Derived } from "leviathan-state";
 import type { HTML, JSX } from "./html";
-
-// support for custom elements will come later
-//
-// export class CustomHTMLElement extends HTMLElement {
-//     constructor();
-// }
 
 /** the inputs to a jsx element, consists of:
  *
@@ -54,8 +50,6 @@ export type Classes = HTML.ClassList;
 /** the properties that can be used as an inline style */
 export type Style = HTML.CSSProperties;
 
-// CSS //
-
 /** write css in your javascript files
  *
  * example:
@@ -86,80 +80,3 @@ export type Style = HTML.CSSProperties;
  * also note that those extensions highlight other things that this jsx implementation does not support, only this plain css function is supported
  */
 export function css(code: string | { raw: readonly string[] | ArrayLike<string> }): HTMLStyleElement;
-
-// REF //
-
-type RefValidTargets = object | "" | keyof HTMLElementTagNameMap | keyof SVGElementTagNameMap
-
-type RefWithCurrent<T> = T & { current: T | null };
-
-/** a special type of object which can be referenced first and initialized later, created by the function `ref`
- *
- * you can also use the name of the element to specify the type of the element you want to track
- *
- * for example `Ref<"div">` is the same as `Ref<HTMLDivElement>`
- */
-export type Ref<T extends RefValidTargets = object> = RefWithCurrent<
-    T extends keyof HTMLElementTagNameMap
-    ? HTMLElementTagNameMap[T] :
-    T extends keyof SVGElementTagNameMap
-    ? SVGElementTagNameMap[T] :
-    T extends ""
-    ? DocumentFragment :
-    T
->;
-
-/** creates a ref, which is a special type of object which can be referenced first and initialized later
- *
- * you can initialize it by setting its current property
- *
- * when it is not initialized, most operations on it will throw a TypeError
- */
-export function ref<T extends RefValidTargets = object>(init?: T | null | undefined): Ref<T>;
-
-// #region Globals
-
-declare global {
-    interface Element {
-        /** method added by levi-dom
-         *
-         * finds the first ancestor of an element that passes a filter
-         *
-         * this element is included in the search */
-        findParent(filter: (x: Element) => boolean): Element | null;
-        /** method added by levi-dom
-         *
-         * traverses the tree forward and returns the first element that passes a filter
-         *
-         * this element is not included in the search
-         *
-         * if root is not undefined, the search will only occour inside the children of root, defaults to this element */
-        findForward(filter: (x: Element) => boolean, root?: Element | null): Element | null;
-        /** method added by levi-dom
-         *
-         * traverses the tree forward and focuses on the first element that can get focus
-         *
-         * this element is not included in the search
-         *
-         * if root is not undefined, the search will only occour inside the children of root, defaults to this element
-         *
-         * @param includeNonTabbable - when set to true elements that cannot be reached via the tab key will also be elligible to be focused, defaults to false */
-        focusForward(includeNonTabbable?: boolean, root?: Element | null): HTMLElement | null;
-    }
-    // support for custom elements will come later
-    //
-    // interface CustomElementRegistry {
-    //     /** method added by levi-dom
-    //      *
-    //      * registers custom element constructors as autonomous custom elements
-    //      *
-    //      * the name for the element is derived from key on the object, this way of registering allows minification of the name of the class without affecting the name that will be registered
-    //      *
-    //      * names are expected to be in `CamelCase` which will be converted to `kebab-case`
-    //      *
-    //      * if the resulting kebab case name has no hyphen, the prefix `"custom-"` will be added, this is done because it is required that custom elements have at least one hyphen in their name */
-    //     register(classes: Record<string, CustomElementConstructor>): void;
-    // }
-}
-
-// #endregion
