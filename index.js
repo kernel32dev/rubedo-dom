@@ -30,8 +30,10 @@ export function css(code) {
 
 // #region Ref
 
-export function ref() {
-    return new Proxy({ __proto__: null, current: null }, ref_proxy);
+export function ref(current) {
+    if (current === undefined) current = null;
+    if (typeof current != "object") throw new TypeError("can't initialize a ref with a value of type " + typeof current)
+    return new Proxy({ __proto__: null, current }, ref_proxy);
 }
 
 function unwrap_ref(target) {
