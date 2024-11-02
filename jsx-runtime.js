@@ -203,7 +203,7 @@ function jsx_apply_props(elem, props) {
             new Effect(elem, () => {
                 const x = "" + value();
                 if (x !== elem.value) elem.value = x;
-            });
+            }).run();
         } else if (key === "checked" && value instanceof Derived && elem instanceof HTMLInputElement) {
             if (value instanceof State) {
                 elem.addEventListener("input", function () {
@@ -216,7 +216,7 @@ function jsx_apply_props(elem, props) {
             new Effect(elem, () => {
                 const x = !!value();
                 if (x !== elem.checked) elem.checked = x;
-            });
+            }).run();
         } else if (key === "ref") {
             if (typeof value === "function") {
                 value.call(elem, elem);
@@ -299,7 +299,7 @@ function jsx_apply_props(elem, props) {
                         throw new Error("jsx: unsupported object attribute " + name);
                     }
                 }
-            });
+            }).run();
         }
     }
 }
@@ -328,7 +328,7 @@ function jsx_apply_class(tokens, prop) {
                 }
             }
             jsx_apply_stateless_class(tokens, v, bucket);
-        });
+        }).run();
     } else {
         for (const key in prop) {
             const item = prop[key];
@@ -336,7 +336,7 @@ function jsx_apply_class(tokens, prop) {
             if (item instanceof Derived) {
                 new Effect(tokens, () => {
                     tokens.toggle(key, !!item());
-                });
+                }).run();
             } else {
                 tokens.add(key);
             }
@@ -416,6 +416,7 @@ function jsx_apply_stateful_children(elem, state) {
     const affector = new Effect.Weak(jsx);
     /** @type {Output} */
     let output = elem.appendChild(jsx_create_text_node("", affector, sym_jsx)); // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
+    affector.run();
     function jsx() {
         output = jsx_replace_output(output, jsx_compute_derivable_nodes(state(), affector, sym_jsx), sym_jsx);
     }
@@ -457,6 +458,7 @@ function jsx_compute_tracked_array(v, outer_affector, outer_sym_jsx) {
     const mapped = v.$map(v => jsx_compute_derivable_nodes(v, affector, sym_jsx));
     const output = [jsx_create_text_node("", affector, sym_jsx)]; // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
     if (outer_sym_jsx) jsx[outer_sym_jsx] = outer_affector;
+    affector.run();
     return output;
     function jsx() {
         State.Array.use(mapped);
