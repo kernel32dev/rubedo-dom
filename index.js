@@ -1,6 +1,5 @@
 export * from "leviathan-state";
 export * from "./ref";
-export * from "./signal";
 export * from "./scope";
 
 export function css(code) {

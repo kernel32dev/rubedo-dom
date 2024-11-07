@@ -1,7 +1,6 @@
 export * from "leviathan-state";
 export * from "./ref";
 export * from "./scope";
-export * from "./signal";
 import type { Derived } from "leviathan-state";
 import type { HTML, JSX } from "./html";
 

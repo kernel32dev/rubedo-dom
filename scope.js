@@ -1,5 +1,4 @@
-import { Derived } from "leviathan-state";
-import { Signal } from "./signal";
+import { Derived, Signal } from "leviathan-state";
 
 export function Scope() {
     Object.setPrototypeOf(Scope, new.target ? new.target.prototype || ScopePrototype : ScopePrototype);
@@ -103,7 +102,7 @@ function signal(signal, handler) {
     if (!(signal instanceof Signal)) throw new TypeError("signal is not a Signal");
     if (typeof handler != "function") throw new TypeError("handler is not a function");
     this.effects.add(() => {
-        signal.on(handler);
+        signal.persistent(handler);
         return () => signal.off(handler);
     });
     return this;
