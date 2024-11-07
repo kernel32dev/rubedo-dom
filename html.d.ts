@@ -714,6 +714,7 @@ export namespace HTML {
          * For examples and more information, visit:
          * https://github.com/frenic/csstype#what-should-i-do-when-i-get-type-errors
          */
+        [varprop: `--${string}`]: string | number;
     }
 
     type HTMLAttributeReferrerPolicy =
