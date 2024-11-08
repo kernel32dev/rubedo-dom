@@ -175,9 +175,6 @@ export function jsx(tag, props) {
 /** @param {HTMLElement | SVGElement} elem newly created element @param {Props} props  */
 function jsx_apply_props(elem, props) {
     if (props === null) return;
-    if (elem instanceof DocumentFragment) {
-        debugger;
-    }
     for (const key in props) {
         if (key === "__source") {
             // let source = (props as any)["__source"] as { fileName: string, lineNumber: number, columnNumber: number };
@@ -432,23 +429,41 @@ function jsx_compute_derivable_nodes(v, affector, sym_jsx) {
     }
     if (!v) return jsx_create_text_node("", affector, sym_jsx);
     if (v instanceof Node) {
-        v[sym_jsx] = affector;
-        return v;
-    }
-    if (is_view(v)) {
+    } else if (is_view(v)) {
         v = v.view();
         if (!(v instanceof Node)) throw new TypeError("jsx: view method did not return a Node");
-        v[sym_jsx] = affector;
-        return v;
+    } else {
+        // TODO! handle iterable
+        if (!Array.isArray(v)) {
+            throw new TypeError("jsx: invalid object returned by derivation, not a Node, View or Array");
+        }
+        if (!(v instanceof State.Array)) {
+            return /** @type {DeriveableNodes[]} */ (v).map(v => jsx_compute_derivable_nodes(v, affector, sym_jsx));
+        }
+        return jsx_compute_tracked_array(v, affector, sym_jsx);
     }
-    // TODO! handle iterable
-    if (!Array.isArray(v)) {
-        throw new TypeError("jsx: invalid object returned by derivation, not a Node, View or Array");
+    if (v.nodeType == 11) {
+        const output = [];
+        jsx_collect_document_fragment_children(output, sym_jsx, affector, v.childNodes);
+        if (!output.length) return jsx_create_text_node("", affector, sym_jsx);
+        return output;
     }
-    if (!(v instanceof State.Array)) {
-        return /** @type {DeriveableNodes[]} */ (v).map(v => jsx_compute_derivable_nodes(v, affector, sym_jsx));
+    v[sym_jsx] = affector;
+    return v;
+}
+
+/** @param {Node[]} output @param {Effect} affector @param {symbol} sym_jsx @param {NodeListOf<ChildNode>} children */
+function jsx_collect_document_fragment_children(output, sym_jsx, affector, children) {
+    const length = children.length;
+    for (let i = 0; i < length; i++) {
+        const node = children[i];
+        if (node.nodeType == 11) {
+            jsx_collect_document_fragment_children(output, sym_jsx, affector, node.childNodes);
+        } else {
+            output.push(node);
+            node[sym_jsx] = affector;
+        }
     }
-    return jsx_compute_tracked_array(v, affector, sym_jsx);
 }
 
 /** @param {DeriveableNodes[]} v  @param {Effect} [outer_affector] @param {symbol} [outer_sym_jsx] @returns {Output} */
@@ -491,6 +506,7 @@ function jsx_replace_output(old_output, new_output, sym_jsx) {
         old_output.nodeValue = new_output.nodeValue;
         return old_output;
     }
+    // TODO! do this with less dom calls
     // 1. get the last element of old_output
     const last = jsx_last_output(old_output);
     const parent = last.parentNode;
