@@ -1,4 +1,4 @@
-import type { Signal, SignalHandler } from "./signal";
+import type { Signal } from "rubedo";
 
 /** a function that can hold multiple effects, mean to be passed to the `useMount` attribute
  *
@@ -29,7 +29,7 @@ export interface Scope {
     /** calls callback when the effects object is called, and will rerun the dependencies until teardown is called */
     affect(callback: () => void): this;
     /** attaches the callback to the signal until teardown is called */
-    signal<Args extends any[], This>(signal: Signal<Args, This>, handler: SignalHandler<Args, This>): this;
+    signal<T extends (...args: any[]) => void>(signal: Signal<T>, handler: Signal.Handler<T>): this;
 }
 
 // TODO! add asyncInterval

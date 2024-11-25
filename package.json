@@ -1,6 +1,6 @@
 {
     "name": "rubedo-dom",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "A simple JSX implementation that supports the use of state derivations",
     "main": "index.js",
     "types": "index.d.ts",

@@ -1,5 +1,5 @@
 export type { JSX } from "./html";
-import { ElemsOf, PropsOf } from ".";
+import { ElemsOf, PropsOf, Tag, TagNoProps } from ".";
 
 export const jsxDEV: {
     <T extends TagNoProps>(tagname: T): ElemsOf<T>;
