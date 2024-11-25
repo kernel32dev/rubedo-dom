@@ -9,7 +9,7 @@ First install rubedo-dom with `npm i rubedo-dom` (types already included)
 To configure your frontend project to use rubedo-dom, alter your `tsconfig.json` to have
 
 ```json
-"jsx": "preserve",
+"jsx": "react-jsx",
 "jsxImportSource": "rubedo-dom",
 ```
 
