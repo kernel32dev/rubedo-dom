@@ -14,7 +14,7 @@ import type { Signal, SignalHandler } from "./signal";
  */
 export interface Scope {
     (): () => void;
-    /** true if the effects was called and the teardown was not yet called */
+    /** true if the effects was called and the teardown has not yet been called */
     readonly active: boolean;
     readonly effects: Set<() => (void | (() => void))>,
     /** adds the callback to be called when the effects is called, the most basic form of an effect
@@ -24,7 +24,7 @@ export interface Scope {
     use(callback: () => (void | (() => void))): this;
     /** adds a callback to be called when the timeout runs out, if teardown is called before the time runs out then the callback is never called */
     timeout(timeout: number, callback: () => void): this;
-    /** calls callback aproximately every timeout milliseconds, if teardown is called the cicle stops */
+    /** calls callback approximately every timeout milliseconds, if teardown is called the cycle stops */
     interval(timeout: number, callback: () => void): this;
     /** calls callback when the effects object is called, and will rerun the dependencies until teardown is called */
     affect(callback: () => void): this;

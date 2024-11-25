@@ -1,4 +1,4 @@
-import { Derived, Signal } from "leviathan-state";
+import { Derived, Signal } from "rubedo";
 
 export function Scope() {
     Object.setPrototypeOf(Scope, new.target ? new.target.prototype || ScopePrototype : ScopePrototype);

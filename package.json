@@ -1,7 +1,7 @@
 {
-    "name": "leviathan-dom",
-    "version": "0.0.0",
-    "description": "A simple JSX implementation that supports the use of derivations",
+    "name": "rubedo-dom",
+    "version": "0.1.0",
+    "description": "A simple JSX implementation that supports the use of state derivations",
     "main": "index.js",
     "types": "index.d.ts",
     "files": [
@@ -18,19 +18,23 @@
         "jsx-dev-runtime.js",
         "jsx-dev-runtime.d.ts",
         "html.d.ts",
-        "css.d.ts"
+        "css.d.ts",
+        "elements.js",
+        "elements.d.ts"
     ],
     "scripts": {},
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/kernel32dev/leviathan-dom.git"
+        "url": "git+https://github.com/kernel32dev/rubedo-dom.git"
     },
+    "bugs": "https://github.com/kernel32dev/rubedo-dom/issues",
+    "homepage": "https://github.com/kernel32dev/rubedo-dom",
     "keywords": [
         "dom", "jsx", "state", "html"
     ],
     "author": "kernel32dev",
     "license": "MIT",
     "dependencies": {
-        "leviathan-state": "file:../leviathan-state"
+        "rubedo": "0.1.0"
     }
 }

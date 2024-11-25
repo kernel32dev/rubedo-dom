@@ -22,15 +22,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 // the license above refers to the code in this file that is from the React library
-// declarations for JSX taken from React and adaptated to better represent standard html and to work with leviathan
+// declarations for JSX taken from React and adapted to better represent standard html and to work with rubedo
 // in the future it would be interesting to generate the code in this file from the spec directly, but until then this will do
-import type { Derived, State } from "leviathan-state";
+import type { Derived, State } from "rubedo";
 import type * as CSS from "./css";
-import type * as LEVI from ".";
+import type * as RUBEDO from ".";
 
 export namespace JSX {
     /** used by typescript to determine the type of jsx expressions */
-    type Element = LEVI.Elems;
+    type Element = RUBEDO.Elems;
     /** used by typescript to get the type of children from the props */
     interface ElementChildrenAttribute {
         children: {};
@@ -327,7 +327,7 @@ export namespace HTML {
     type TransitionEventHandler<T = Element> = EventHandler<T, globalThis.TransitionEvent>;
 
     interface DOMAttributes<T> {
-        children?: LEVI.Nodes;
+        children?: RUBEDO.Nodes;
 
         useMount?: (() => void | (() => void)) | undefined;
 
@@ -705,17 +705,11 @@ export namespace HTML {
         | Derived<StatelessClassList | StatelessClassList[]>;
     type StatelessClassList = string | false | null | undefined | { [className: string]: boolean | null | undefined };
 
-    interface CSSProperties extends CSS.Properties<string | number> {
-        /**
-         * The index signature was removed to enable closed typing for style
-         * using CSSType. You're able to use type assertion or module augmentation
-         * to add properties or an index signature of your own.
-         *
-         * For examples and more information, visit:
-         * https://github.com/frenic/csstype#what-should-i-do-when-i-get-type-errors
-         */
-        [varprop: `--${string}`]: string | number;
-    }
+    type CSSPropertiesAugmentations = {
+        [P in keyof RUBEDO.StyleAugmentations]: Derived.Or<RUBEDO.StyleAugmentations[P]>;
+    };
+
+    interface CSSProperties extends CSS.Properties<string | number>, CSSPropertiesAugmentations {}
 
     type HTMLAttributeReferrerPolicy =
         | ""
@@ -898,7 +892,8 @@ export namespace HTML {
         alt?: Derived.Or<string | undefined>;
         autoComplete?: Derived.Or<string | undefined>;
         capture?: Derived.Or<boolean | "user" | "environment" | undefined>; // https://www.w3.org/TR/html-media-capture/#the-capture-attribute
-        checked?: State.Or<boolean | undefined>;
+        checked?: Derived.Or<boolean | undefined> | State<boolean>;
+        children?: [],
         disabled?: Derived.Or<boolean | undefined>;
         enterKeyHint?: Derived.Or<"enter" | "done" | "go" | "next" | "previous" | "search" | "send" | undefined>;
         form?: Derived.Or<string | undefined>;
@@ -923,7 +918,7 @@ export namespace HTML {
         src?: Derived.Or<string | undefined>;
         step?: Derived.Or<number | string | undefined>;
         type?: Derived.Or<HTMLInputTypeAttribute | undefined>;
-        value?: State.Or<string | undefined>;
+        value?: Derived.Or<string | undefined> | State<string>;
         width?: Derived.Or<number | string | undefined>;
 
         onChange?: EventHandler<T> | undefined;
@@ -1077,7 +1072,7 @@ export namespace HTML {
         name?: Derived.Or<string | undefined>;
         required?: Derived.Or<boolean | undefined>;
         size?: Derived.Or<number | undefined>;
-        value?: State.Or<string | readonly string[] | undefined>;
+        value?: Derived.Or<string | readonly string[] | undefined> | State<string | readonly string[]>;
         onChange?: EventHandler<T> | undefined;
     }
 
@@ -1123,7 +1118,7 @@ export namespace HTML {
         readOnly?: Derived.Or<boolean | undefined>;
         required?: Derived.Or<boolean | undefined>;
         rows?: Derived.Or<number | undefined>;
-        value?: State.Or<string | undefined>;
+        value?: Derived.Or<string | undefined> | State<string>;
         wrap?: Derived.Or<string | undefined>;
 
         onChange?: EventHandler<T> | undefined;
