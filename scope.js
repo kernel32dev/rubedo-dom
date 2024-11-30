@@ -1,17 +1,19 @@
-import { Derived, Signal } from "rubedo";
+import { Signal, Effect } from "rubedo";
 
 export function Scope() {
-    Object.setPrototypeOf(Scope, new.target ? new.target.prototype || ScopePrototype : ScopePrototype);
+    if (!new.target) throw new TypeError("Constructor Scope requires 'new'");
+    Object.setPrototypeOf(Scope, new.target.prototype);
     Object.defineProperty(Scope, "effects", { value: new Set(), writable: false, enumerable: true, configurable: false });
     Object.defineProperty(Scope, "active", { value: false, writable: true, enumerable: true, configurable: false });
     return Scope;
-    function Scope() {
+    function Scope(target) {
         if (Scope.active) throw new Error("effects already active");
         Scope.active = true;
+        Scope.target = target;
         let teardowns = null;
         for (const i of Scope.effects) {
             try {
-                const teardown = i();
+                const teardown = i(target);
                 if (typeof teardown == "function") {
                     if (teardowns) {
                         teardowns.push(teardown);
@@ -26,6 +28,7 @@ export function Scope() {
         if (teardowns) return () => {
             if (!teardowns) return;
             Scope.active = false;
+            delete Scope.target;
             const arr = teardowns;
             teardowns = null;
             const length = arr.length;
@@ -39,7 +42,10 @@ export function Scope() {
         };
         teardowns = true;
         return () => {
-            if (teardowns) teardowns = Scope.active = false;
+            if (teardowns) {
+                delete Scope.target;
+                teardowns = Scope.active = false;
+            }
         };
     }
 }
@@ -65,10 +71,10 @@ function timeout(timeout, callback) {
     if (typeof timeout != "number") throw new TypeError("timeout is not a number");
     if (typeof callback != "function") throw new TypeError("callback is not a function");
     const effects = this.effects;
-    const setup = () => {
+    const setup = target => {
         const handle = setTimeout(() => {
             effects.delete(setup);
-            callback();
+            callback(target);
         }, timeout);
         return () => {
             effects.delete(setup);
@@ -82,8 +88,8 @@ function timeout(timeout, callback) {
 function interval(timeout, callback) {
     if (typeof timeout != "number") throw new TypeError("timeout is not a number");
     if (typeof callback != "function") throw new TypeError("callback is not a function");
-    this.effects.add(() => {
-        const handle = setInterval(callback, timeout);
+    this.effects.add(target => {
+        const handle = setInterval(callback, timeout, target);
         return () => clearInterval(handle);
     });
     return this;
@@ -92,8 +98,8 @@ function interval(timeout, callback) {
 function affect(callback) {
     if (typeof callback != "function") throw new TypeError("callback is not a function");
     this.effects.add(() => {
-        Derived.affect("everything", callback);
-        return () => Derived.affect.clear(callback);
+        const effect = new Effect.Persistent(callback);
+        return () => effect.clear();
     });
     return this;
 }

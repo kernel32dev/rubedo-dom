@@ -23,8 +23,8 @@ export function css(code) {
 const sym_mount_count = Symbol("jsx_mount_count");
 const sym_on_mount = Symbol("jsx_on_mount");
 const sym_on_unmount = Symbol("jsx_on_unmount");
-const sym_use_mount = Symbol("jsx_use_mount");
-const sym_unuse_mount = Symbol("jsx_unuse_mount");
+const sym_scope = Symbol("jsx_scope");
+const sym_unscope = Symbol("jsx_unscope");
 
 if (document.body) {
     new MutationObserver(jsx_handle_dom_mutations).observe(document.body, { childList: true, subtree: true });
@@ -70,9 +70,9 @@ function jsx_handle_dom_mutations(list) {
 
 /** @param {Node} node */
 function jsx_trigger_unmount(node) {
-    const unuse_mount = node[sym_unuse_mount];
+    const unuse_mount = node[sym_unscope];
     if (unuse_mount) {
-        delete node[sym_unuse_mount];
+        delete node[sym_unscope];
         queueMicrotask(unuse_mount);
     }
     const event = node[sym_on_unmount];
@@ -91,10 +91,10 @@ function jsx_trigger_unmount(node) {
 function jsx_trigger_mount(node) {
     const event = node[sym_on_mount];
     if (event) queueMicrotask(event);
-    const use_mount = node[sym_use_mount];
-    if (use_mount) queueMicrotask(() => {
-        const unuse_mount = use_mount();
-        if (typeof unuse_mount == "function") node[sym_unuse_mount] = unuse_mount;
+    const scope = node[sym_scope];
+    if (scope) queueMicrotask(() => {
+        const unuse_mount = scope(node);
+        if (typeof unuse_mount == "function") node[sym_unscope] = unuse_mount;
     });
     const children = node.childNodes;
     const length = children.length;
@@ -285,28 +285,28 @@ function jsx_apply_props(elem, props) {
             } else {
                 throw new Error("jsx: ref passed was a value of type " + typeof value);
             }
-        } else if (key === "useMount") {
+        } else if (key === "scope") {
             if (typeof value == "function") {
-                if (!(sym_on_mount in elem || sym_on_unmount in elem || sym_use_mount in elem)) {
+                if (!(sym_on_mount in elem || sym_on_unmount in elem || sym_scope in elem)) {
                     for (let i = /** @type {Node | null} */ (elem); i; i = i.parentElement) {
                         i[sym_mount_count] = (i[sym_mount_count] || 0) + 1;
                     }
                 }
-                elem[sym_use_mount] = value;
+                elem[sym_scope] = value;
             } else if (value !== undefined) {
-                throw new Error("jsx: event attributes must be functions");
+                throw new Error("jsx: scope attribute must be a function");
             }
         } else if (key.startsWith("on")) {
             if (typeof value == "function") {
                 if (key === "onMount") {
-                    if (!(sym_on_mount in elem || sym_on_unmount in elem || sym_use_mount in elem)) {
+                    if (!(sym_on_mount in elem || sym_on_unmount in elem || sym_scope in elem)) {
                         for (let i = /** @type {Node | null} */ (elem); i; i = i.parentElement) {
                             i[sym_mount_count] = (i[sym_mount_count] || 0) + 1;
                         }
                     }
                     elem[sym_on_mount] = value.bind(elem);
                 } else if (key === "onUnmount") {
-                    if (!(sym_on_mount in elem || sym_on_unmount in elem || sym_use_mount in elem)) {
+                    if (!(sym_on_mount in elem || sym_on_unmount in elem || sym_scope in elem)) {
                         for (let i = /** @type {Node | null} */ (elem); i; i = i.parentElement) {
                             i[sym_mount_count] = (i[sym_mount_count] || 0) + 1;
                         }

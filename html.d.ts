@@ -329,7 +329,7 @@ export namespace HTML {
     interface DOMAttributes<T> {
         children?: RUBEDO.Nodes;
 
-        useMount?: (() => void | (() => void)) | undefined;
+        scope?: ((target: T) => void | (() => void)) | undefined;
 
         // Mount Events
         onMount?: MountEventHandler<T> | undefined; // TODO! update these types
