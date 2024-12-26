@@ -37,6 +37,6 @@
     "author": "kernel32dev",
     "license": "MIT",
     "dependencies": {
-        "rubedo": "0.1.0"
+        "rubedo": "file:../rubedo"
     }
 }
