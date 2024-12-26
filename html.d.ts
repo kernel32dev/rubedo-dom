@@ -51,6 +51,8 @@ export namespace JSX {
 
     /** used by typescript to determine the props of each element */
     interface IntrinsicElements {
+        // FRAGMENT
+        "": {};
         // HTML
         a: HTML.AnchorHTMLAttributes<HTMLAnchorElement>;
         abbr: HTML.HTMLAttributes<HTMLElement>;
