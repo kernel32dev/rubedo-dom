@@ -8,6 +8,9 @@ import { State, Derived, Effect } from "rubedo";
 /** @typedef {Node | (OutputArray & {parentNode?: never})} Output */
 /** @typedef {Output[]} OutputArray */
 
+import elems from "./elements";
+export { elems };
+
 export * from "./ref";
 export * from "./scope";
 
@@ -240,6 +243,7 @@ function jsx_apply_props(elem, props) {
             continue;
         }
         const value = props[key];
+        if (value === undefined) continue;
         if (key === "value" && value instanceof Derived && (elem instanceof HTMLInputElement || elem instanceof HTMLTextAreaElement)) {
             if (value instanceof State) {
                 elem.addEventListener("input", function () {

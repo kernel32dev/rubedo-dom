@@ -1,3 +1,5 @@
+import elems from "./elements";
+export { elems };
 export * from "./ref";
 export * from "./scope";
 import type { Derived } from "rubedo";
