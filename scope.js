@@ -50,16 +50,19 @@ export function Scope() {
     }
 }
 
-const ScopePrototype = { __proto__: Function.prototype };
+Scope.prototype = defineNonEnumerable({ __proto__: Function.prototype },{
+    constructor: Scope,
+    use,
+    timeout,
+    interval,
+    affect,
+    signal,
+});
 
-Scope.prototype = ScopePrototype;
-
-Object.defineProperty(ScopePrototype, "constructor", { value: Scope, writable: true, configurable: true });
-Object.defineProperty(ScopePrototype, "use", { value: use, writable: true, configurable: true })
-Object.defineProperty(ScopePrototype, "timeout", { value: timeout, writable: true, configurable: true })
-Object.defineProperty(ScopePrototype, "interval", { value: interval, writable: true, configurable: true })
-Object.defineProperty(ScopePrototype, "affect", { value: affect, writable: true, configurable: true })
-Object.defineProperty(ScopePrototype, "signal", { value: signal, writable: true, configurable: true })
+function defineNonEnumerable(target, obj) {
+    for (const key in obj) Object.defineProperty(target, key, { value: obj[key], writable: true, configurable: true });
+    return target;
+}
 
 function use(callback) {
     if (typeof callback != "function") throw new TypeError("callback is not a function");

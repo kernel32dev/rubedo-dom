@@ -11,6 +11,7 @@ import { State, Derived, Effect } from "rubedo";
 import elems from "./elements";
 export { elems };
 
+export * from "./context";
 export * from "./ref";
 export * from "./scope";
 
@@ -23,24 +24,26 @@ export function css(code) {
 
 //#region Mount detector
 
-const sym_mount_count = Symbol("jsx_mount_count");
-const sym_on_mount = Symbol("jsx_on_mount");
-const sym_on_unmount = Symbol("jsx_on_unmount");
+const sym_scope_count = Symbol("sym_scope_count");
 const sym_scope = Symbol("jsx_scope");
 const sym_unscope = Symbol("jsx_unscope");
 
-if (document.body) {
-    new MutationObserver(jsx_handle_dom_mutations).observe(document.body, { childList: true, subtree: true });
-} else {
-    document.addEventListener("DOMContentLoaded", () => {
-        new MutationObserver(jsx_handle_dom_mutations).observe(document.body, { childList: true, subtree: true });
-    });
+/** @type {MutationObserver | null} */
+let mutation_observer = null;
+
+function jsx_init_mutation_observer() {
+    if (!mutation_observer) {
+        mutation_observer = new MutationObserver(jsx_handle_dom_mutations);
+        mutation_observer.observe(document.body, { childList: true, subtree: true });
+    }
 }
 
 /** @param {MutationRecord[]} list */
 function jsx_handle_dom_mutations(list) {
-    // TODO! detect and omit calls to unmount followed by mount
     const length = list.length;
+    if (length >= 2) console.log(`length ${length} >= 2`, list);
+    /** @type {Map<Node, Node | null>} */
+    const map = new Map();
     for (let i = 0; i < length; i++) {
         const record = list[i];
         const target = record.target;
@@ -48,24 +51,45 @@ function jsx_handle_dom_mutations(list) {
         const adds = record.addedNodes;
         for (let j = 0; j < removes.length; j++) {
             const remove = removes[j];
-            /** @type {number | undefined} */
-            const track_mount_count = remove[sym_mount_count];
-            if (track_mount_count) {
-                for (let i = /** @type {Node | null} */ (target); i; i = i.parentElement) {
-                    i[sym_mount_count] -= track_mount_count;
-                }
-                jsx_trigger_unmount(remove);
-            }
+            if (!map.has(remove)) map.set(remove, target);
         }
         for (let j = 0; j < adds.length; j++) {
             const add = adds[j];
+            if (!map.has(add)) map.set(add, null);
+        }
+    }
+    /** @type {Map<Node, number>} */
+    const delta_scope_count = new Map();
+    for (const [remove, oldParent] of map) {
+        const newParent = remove.getRootNode() == document ? remove.parentNode : null;
+        if (oldParent && newParent != oldParent) {
             /** @type {number | undefined} */
-            const track_mount_count = add[sym_mount_count];
-            if (track_mount_count) {
-                for (let i = /** @type {Node | null} */ (target); i; i = i.parentElement) {
-                    i[sym_mount_count] = (i[sym_mount_count] || 0) + track_mount_count;
-                }
-                jsx_trigger_mount(add);
+            const scope_count = remove[sym_scope_count];
+            if (scope_count) {
+                delta_scope_count.set(
+                    oldParent,
+                    (delta_scope_count.get(oldParent) || 0) - scope_count,
+                );
+                jsx_trigger_unmount(remove);
+            }
+        }
+    }
+    for (const [add, oldParent] of map) {
+        const newParent = add.getRootNode() == document ? add.parentNode : null;
+        if (newParent && (!oldParent || newParent != oldParent)) {
+            const scope_count = jsx_trigger_mount(add);
+            if (scope_count && oldParent) {
+                delta_scope_count.set(
+                    oldParent,
+                    (delta_scope_count.get(oldParent) || 0) + scope_count,
+                );
+            }
+        }
+    }
+    for (const [parent, delta] of delta_scope_count) {
+        if (delta) {
+            for (let i = parent; i != document.body; i = /** @type {Node} */ (i.parentNode)) {
+                i[sym_scope_count] = (i[sym_scope_count] || 0) + delta;
             }
         }
     }
@@ -73,18 +97,17 @@ function jsx_handle_dom_mutations(list) {
 
 /** @param {Node} node */
 function jsx_trigger_unmount(node) {
-    const unuse_mount = node[sym_unscope];
-    if (unuse_mount) {
+    delete node[sym_scope_count];
+    const unscope = node[sym_unscope];
+    if (unscope) {
         delete node[sym_unscope];
-        queueMicrotask(unuse_mount);
+        queueMicrotask(unscope);
     }
-    const event = node[sym_on_unmount];
-    if (event) queueMicrotask(event);
     const children = node.childNodes;
     const length = children.length;
     for (let i = 0; i < length; i++) {
         const child = children[i];
-        if (child[sym_mount_count]) {
+        if (child[sym_scope_count] > 0) {
             jsx_trigger_unmount(child);
         }
     }
@@ -92,21 +115,16 @@ function jsx_trigger_unmount(node) {
 
 /** @param {Node} node */
 function jsx_trigger_mount(node) {
-    const event = node[sym_on_mount];
-    if (event) queueMicrotask(event);
     const scope = node[sym_scope];
-    if (scope) queueMicrotask(() => {
-        const unuse_mount = scope(node);
-        if (typeof unuse_mount == "function") node[sym_unscope] = unuse_mount;
-    });
+    if (scope) queueMicrotask(scope);
+    let scope_count = scope ? 1 : 0;
     const children = node.childNodes;
     const length = children.length;
     for (let i = 0; i < length; i++) {
-        const child = children[i];
-        if (child[sym_mount_count]) {
-            jsx_trigger_mount(child);
-        }
+        scope_count += jsx_trigger_mount(children[i]);
     }
+    if (scope_count) node[sym_scope_count] = scope_count;
+    return scope_count;
 }
 
 //#endregion
@@ -208,7 +226,7 @@ export function jsx(tag, props, key) {
             return document.createElement(tag);
         }
     }
-    if (arguments.length >= 3) {
+    if (arguments.length == 3 || (arguments.length > 3 && key !== undefined)) {
         /** @type {any} */ (props).key = key;
     }
     if (typeof tag == "string") {
@@ -291,34 +309,19 @@ function jsx_apply_props(elem, props) {
             }
         } else if (key === "scope") {
             if (typeof value == "function") {
-                if (!(sym_on_mount in elem || sym_on_unmount in elem || sym_scope in elem)) {
-                    for (let i = /** @type {Node | null} */ (elem); i; i = i.parentElement) {
-                        i[sym_mount_count] = (i[sym_mount_count] || 0) + 1;
-                    }
-                }
-                elem[sym_scope] = value;
+                jsx_init_mutation_observer();
+                elem[sym_scope] = function scope() {
+                    const unscope = value(elem);
+                    if (typeof unscope == "function") elem[sym_unscope] = unscope;
+                };
             } else if (value !== undefined) {
                 throw new Error("jsx: scope attribute must be a function");
             }
+        } else if (key === "context") {
+            jsx_apply_context(elem, value);
         } else if (key.startsWith("on")) {
             if (typeof value == "function") {
-                if (key === "onMount") {
-                    if (!(sym_on_mount in elem || sym_on_unmount in elem || sym_scope in elem)) {
-                        for (let i = /** @type {Node | null} */ (elem); i; i = i.parentElement) {
-                            i[sym_mount_count] = (i[sym_mount_count] || 0) + 1;
-                        }
-                    }
-                    elem[sym_on_mount] = value.bind(elem);
-                } else if (key === "onUnmount") {
-                    if (!(sym_on_mount in elem || sym_on_unmount in elem || sym_scope in elem)) {
-                        for (let i = /** @type {Node | null} */ (elem); i; i = i.parentElement) {
-                            i[sym_mount_count] = (i[sym_mount_count] || 0) + 1;
-                        }
-                    }
-                    elem[sym_on_unmount] = value.bind(elem);
-                } else {
-                    elem.addEventListener(key.slice(2).toLowerCase(), value);
-                }
+                elem.addEventListener(key.slice(2).toLowerCase(), value);
             } else if (value !== undefined) {
                 throw new Error("jsx: event attributes must be functions");
             }
@@ -353,6 +356,18 @@ function jsx_apply_props(elem, props) {
                 }
             }).run();
         }
+    }
+}
+
+function jsx_apply_context(node, context) {
+    if (Array.isArray(context)) {
+        for (let i = 0; i < context.length; i++) {
+            jsx_apply_context(node, context[i]);
+        }
+    } else if (typeof context == "function") {
+        context(node);
+    } else if (context !== undefined) {
+        throw new Error("jsx: invalid context value: " + typeof context);
     }
 }
 

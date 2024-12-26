@@ -9,6 +9,8 @@
         "index.d.ts",
         "ref.js",
         "ref.d.ts",
+        "context.js",
+        "context.d.ts",
         "scope.js",
         "scope.d.ts",
         "signal.js",
