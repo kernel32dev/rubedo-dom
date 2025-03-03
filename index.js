@@ -8,9 +8,6 @@ import { State, Derived, Effect } from "rubedo";
 /** @typedef {Node | (OutputArray & {parentNode?: never})} Output */
 /** @typedef {Output[]} OutputArray */
 
-import elems from "./elements";
-export { elems };
-
 export * from "./context";
 export * from "./ref";
 export * from "./scope";
@@ -21,6 +18,12 @@ export function css(code) {
     document.head.appendChild(style);
     return style;
 }
+
+export const tag = new Proxy({ __proto__: null }, {
+    get(target, p) {
+        return typeof p == "string" ? (target[p] || (target[p] = createElement.bind(null, p))) : undefined;
+    }
+});
 
 //#region Mount detector
 

@@ -20,9 +20,7 @@
         "jsx-dev-runtime.js",
         "jsx-dev-runtime.d.ts",
         "html.d.ts",
-        "css.d.ts",
-        "elements.js",
-        "elements.d.ts"
+        "css.d.ts"
     ],
     "scripts": {},
     "repository": {

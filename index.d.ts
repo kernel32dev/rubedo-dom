@@ -1,9 +1,6 @@
 import type { Derived } from "rubedo";
 import type { HTML, JSX } from "./html";
 
-import elems from "./elements";
-export { elems };
-
 export * from "./context";
 export * from "./ref";
 export * from "./scope";
@@ -155,3 +152,9 @@ export const Fragment: "";
  * also note that those extensions highlight other things that this jsx implementation does not support, only this plain css function is supported
  */
 export function css(code: string | { raw: readonly string[] | ArrayLike<string> }): HTMLStyleElement;
+
+export const tag: {
+    readonly [T in keyof JSX.IntrinsicElements & (keyof HTMLElementTagNameMap | keyof SVGElementTagNameMap)]: {
+        (props?: JSX.IntrinsicElements[T] | null | undefined, ...children: JSX.IntrinsicElements[T] extends {children?: infer U} ? U extends any[] ? U : [] : []): T extends keyof HTMLElementTagNameMap ? HTMLElementTagNameMap[T] : T extends keyof SVGElementTagNameMap ? SVGElementTagNameMap[T] : never;
+    }
+}
