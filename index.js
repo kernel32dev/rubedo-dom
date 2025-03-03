@@ -446,7 +446,9 @@ function jsx_apply_stateless_class(list, prop, bucket) {
 
 export function Elems() {
     const frag = document.createDocumentFragment();
-    jsx_apply_children(frag, arguments);
+    for (let i = 0; i < arguments.length; i++) {
+        jsx_apply_children(frag, arguments[i]);
+    }
     const length = frag.childNodes.length;
     return !length ? document.createTextNode("") : length == 1 ? frag.childNodes[0] : frag;
 }
@@ -470,7 +472,7 @@ function jsx_apply_children(elem, child) {
     } else if (child instanceof Node) {
         elem.appendChild(child);
     } else if (Array.isArray(child)) {
-        if (child instanceof State.Array) {
+        if (child instanceof Derived.Array) {
             jsx_append_output(jsx_compute_tracked_array(child), elem, null);
         } else {
             for (let i = 0; i < /** @type {Array<Nodes>} */ (child).length; i++) {
@@ -542,7 +544,7 @@ function jsx_compute_derivable_nodes(v, affector, sym_jsx) {
         if (!Array.isArray(v)) {
             throw new TypeError("jsx: invalid object returned by derivation, not a Node, View or Array");
         }
-        if (!(v instanceof State.Array)) {
+        if (!(v instanceof Derived.Array)) {
             return /** @type {Nodes[]} */ (v).map(v => jsx_compute_derivable_nodes(v, affector, sym_jsx));
         }
         return jsx_compute_tracked_array(v, affector, sym_jsx);
@@ -581,7 +583,7 @@ function jsx_compute_tracked_array(v, outer_affector, outer_sym_jsx) {
     affector.run();
     return output;
     function jsx() {
-        State.Array.use(mapped);
+        mapped.$use();
         Derived.now(() => {
             const new_output = Array.from(mapped);
             if (new_output.length == 0) new_output[0] = jsx_create_text_node("", affector, sym_jsx);
