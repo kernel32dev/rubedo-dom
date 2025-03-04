@@ -510,15 +510,18 @@ function jsx_append_output(output, parent, child) {
 
 //#region Derived
 
-/** @param {Node} elem @param {Derived<Nodes>} state */
-function jsx_apply_stateful_children(elem, state) {
+/** @param {Node | null} parent @param {Derived<Nodes>} state */
+function jsx_apply_stateful_children(parent, state) {
     const sym_jsx = Symbol("jsx");
     const affector = new Effect.Weak(jsx);
     /** @type {Output} */
-    let output = elem.appendChild(jsx_create_text_node("", affector, sym_jsx)); // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
+    let output = /** @type {Node} */(parent).appendChild(jsx_create_text_node("", affector, sym_jsx)); // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
     affector.run();
     function jsx() {
-        output = jsx_replace_output(output, jsx_compute_derivable_nodes(state(), affector, sym_jsx), sym_jsx);
+        const value = state();
+        parent = jsx_select_parent(output, parent);
+        output = jsx_replace_output(parent, output, jsx_compute_derivable_nodes(value, affector, sym_jsx), sym_jsx);
+        parent = jsx_last_output(output).parentNode;
     }
 }
 
@@ -573,12 +576,14 @@ function jsx_collect_document_fragment_children(output, sym_jsx, affector, child
     }
 }
 
-/** @param {Nodes[]} v  @param {Effect} [outer_affector] @param {symbol} [outer_sym_jsx] @returns {Output} */
+/** @param {Nodes[]} v  @param {Effect} [outer_affector] @param {symbol} [outer_sym_jsx] @returns {Exclude<Output, Node>} */
 function jsx_compute_tracked_array(v, outer_affector, outer_sym_jsx) {
     const affector = new Effect.Weak(jsx);
     const sym_jsx = Symbol("jsx");
     const mapped = v.$map(v => jsx_compute_derivable_nodes(v, affector, sym_jsx));
     const output = [jsx_create_text_node("", affector, sym_jsx)]; // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
+    /** @type {Node | null} */
+    let parent = null;
     if (outer_sym_jsx) jsx[outer_sym_jsx] = outer_affector;
     affector.run();
     return output;
@@ -586,8 +591,10 @@ function jsx_compute_tracked_array(v, outer_affector, outer_sym_jsx) {
         mapped.$use();
         Derived.now(() => {
             const new_output = Array.from(mapped);
+            parent = jsx_select_parent(output, parent);
             if (new_output.length == 0) new_output[0] = jsx_create_text_node("", affector, sym_jsx);
-            jsx_replace_output(output, new_output, sym_jsx);
+            jsx_replace_output(parent, output, new_output, sym_jsx);
+            parent = jsx_last_output(new_output).parentNode;
             output.length = 0;
             output.push.apply(output, new_output);
         });
@@ -606,34 +613,93 @@ function is_view(arg) {
     return typeof arg.view == "function";
 }
 
-/** @param {Output} old_output @param {Output} new_output @param {symbol} sym_jsx @returns {Output} */
-function jsx_replace_output(old_output, new_output, sym_jsx) {
-    // 0. special common case, if it is just text changing, don't swap the nodes
+/** returns the common parent of all nodes in output,
+ *
+ * if all nodes in output have null parent returns null
+ * if all nodes in output have either one same parent or null parent returns that parent
+ * if all nodes in output have two or more parents (ignoring nulls) returns prefered_parent
+ * @param {Output} output @param {Node | null} prefered_parent @returns {Node | null} */
+function jsx_select_parent(output, prefered_parent) {
+    if (!Array.isArray(output)) {
+        return output.parentNode;
+    }
+    let first_occourence = null;
+    const length = output.length;
+    for (let i = 0; i < length; i++) {
+        const suboutput = output[i];
+        const selected_parent = jsx_select_parent(suboutput, prefered_parent);
+        if (first_occourence === null) {
+            first_occourence = selected_parent;
+        } else if (selected_parent !== null && first_occourence !== selected_parent) {
+            return prefered_parent;
+        }
+    }
+    return first_occourence;
+}
+
+/** @param {Node | null} parent @param {Output} old_output @param {Output} new_output @param {symbol} sym_jsx @returns {Output} */
+function jsx_replace_output(parent, old_output, new_output, sym_jsx) {
+    while (Array.isArray(old_output) && old_output.length == 1) old_output = old_output[0];
+    while (Array.isArray(new_output) && new_output.length == 1) new_output = new_output[0];
+    // 0. special case, if it is just text changing, don't swap the nodes
     if (old_output instanceof Text && new_output instanceof Text) {
         old_output.nodeValue = new_output.nodeValue;
         return old_output;
     }
-    // TODO! do this with less dom calls
-    // 1. get the last element of old_output
-    const last = jsx_last_output(old_output);
-    const parent = last.parentNode;
-    if (!parent) return new_output;
-    const child = last.nextSibling;
-    // 2. remove old_output
-    jsx_remove_output(old_output, sym_jsx);
-    jsx_append_output(new_output, parent, child);
-    return new_output;
-}
-
-/** @param {Output} output @param {symbol} sym_jsx  */
-function jsx_remove_output(output, sym_jsx) {
-    if (Array.isArray(output)) {
-        for (let i = 0; i < output.length; i++) {
-            jsx_remove_output(output[i], sym_jsx);
+    /** @type {Node[]} */
+    const new_arr = [];
+    recursive_collect_output(new_output, new_arr);
+    // 1. detach ourselves from old nodes that moved parents, and remove old nodes that are no longer part of the output
+    let lastNode = recursive_remove_and_detach_old_output(old_output, new_arr, parent, sym_jsx) || null;
+    // if there is no parent, undo sym_jsx references from the old nodes, (that are not also new_nodes)
+    // and remove the new output (from wherever they are because we are at null so they also need to be at null)
+    if (!parent) {
+        for (let i = 0; i < new_arr.length; i++) {
+            const node = new_arr[i];
+            if (node.parentNode) node.parentNode.removeChild(node);
         }
-    } else {
-        if (output.parentNode) output.parentNode.removeChild(output);
-        delete output[sym_jsx];
+        return new_output;
+    }
+    // at this point, old_arr is a subset of new_arr, and parent is set
+    for (let i = new_arr.length - 1; i >= 0; i--) {
+        const node = new_arr[i];
+        if (node.nextSibling !== lastNode || (!lastNode && node.parentNode != parent)) {
+            parent.insertBefore(node, lastNode);
+        }
+        lastNode = node;
+    }
+
+    return new_output;
+
+    /** @param {Output} output @param {Node[]} arr */
+    function recursive_collect_output(output, arr) {
+        if (Array.isArray(output)) {
+            for (let i = 0; i < output.length; i++) {
+                recursive_collect_output(output[i], arr);
+            }
+        } else {
+            arr.push(output);
+        }
+    }
+    
+    /** @param {Output} output @param {Node[]} new_arr @param {Node | null} parent @param {symbol} sym_jsx @returns {Node | null | undefined} */
+    function recursive_remove_and_detach_old_output(output, new_arr, parent, sym_jsx) {
+        let lastNode = undefined;
+        if (Array.isArray(output)) {
+            for (let i = 0; i < output.length; i++) {
+                const newLastNode = recursive_remove_and_detach_old_output(output[i], new_arr, parent, sym_jsx);
+                if (newLastNode !== undefined) lastNode = newLastNode;
+            }
+        } else if (output.parentNode != parent) {
+            delete output[sym_jsx];
+        } else {
+            lastNode = output.nextSibling;
+            if (new_arr.indexOf(output) == -1) {
+                parent && parent.removeChild(output);
+                delete output[sym_jsx];
+            }
+        }
+        return lastNode;
     }
 }
 
