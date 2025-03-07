@@ -1,8 +1,20 @@
+export const refs = new WeakSet();
+
 export function ref(current) {
     if (current === undefined) current = null;
     if (typeof current != "object") throw new TypeError("can't initialize a ref with a value of type " + typeof current)
-    return new Proxy({ __proto__: null, current }, ref_proxy);
+    const proxy = new Proxy({ __proto__: null, current }, ref_proxy);
+    refs.add(proxy);
+    return proxy;
 }
+
+Object.defineProperty(ref, "is", {
+    value: function is(obj) {
+        return typeof obj == "object" && !!obj && refs.has(obj);
+    },
+    writable: true,
+    configurable: true,
+});
 
 function unwrap_ref(target) {
     const current = target.current;

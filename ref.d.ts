@@ -25,4 +25,9 @@ export type Ref<T extends RefValidTargets = object> = RefWithCurrent<
  *
  * when it is not initialized, most operations on it will throw a TypeError
  */
-export function ref<T extends RefValidTargets = object>(init?: T | null | undefined): Ref<T>;
+export const ref: {
+    <T extends RefValidTargets = object>(init?: T | null | undefined): Ref<T>;
+
+    /** returns true if the object passed in is a ref */
+    is<T>(obj: T): obj is (T extends { current: Omit<T, "current"> | null } ? T : T extends object ? RefWithCurrent<T> : T);
+};
