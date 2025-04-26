@@ -44,7 +44,7 @@ function jsx_init_mutation_observer() {
 /** @param {MutationRecord[]} list */
 function jsx_handle_dom_mutations(list) {
     const length = list.length;
-    if (length >= 2) console.log(`length ${length} >= 2`, list);
+    // if (length >= 2) console.log(`length ${length} >= 2`, list);
     /** @type {Map<Node, Node | null>} */
     const map = new Map();
     for (let i = 0; i < length; i++) {
