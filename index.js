@@ -4,8 +4,9 @@ import { State, Derived, Effect } from "rubedo";
 /** @typedef {import(".").PropsElem | import(".").PropsSVG} Props */
 /** @typedef {import(".").Nodes} Nodes */
 /** @typedef {import(".").Elems} Elems */
+/** @typedef {Effect & {0: Output, length: 1}} JsxEffect */
 
-/** @typedef {Node | (OutputArray & {parentNode?: never})} Output */
+/** @typedef {Node | OutputArray | JsxEffect} Output */
 /** @typedef {Output[]} OutputArray */
 
 export * from "./context";
@@ -492,13 +493,13 @@ function jsx_apply_children(elem, child) {
 
 /** @param {Output} output @returns {Node} */
 function jsx_last_output(output) {
-    while (Array.isArray(output)) output = output[output.length - 1];
+    while (!(output instanceof Node)) output = output[output.length - 1];
     return output;
 }
 
 /** @param {Output} output @param {Node} parent @param {Node | null} child */
 function jsx_append_output(output, parent, child) {
-    if (Array.isArray(output)) {
+    if (!(output instanceof Node)) {
         for (let i = 0; i < output.length; i++) {
             jsx_append_output(output[i], parent, child);
         }
@@ -510,23 +511,25 @@ function jsx_append_output(output, parent, child) {
 
 //#region Derived
 
+const sym_jsx = Symbol("jsx");
+
 /** @param {Node | null} parent @param {Derived<Nodes>} state */
 function jsx_apply_stateful_children(parent, state) {
-    const sym_jsx = Symbol("jsx");
-    const affector = new Effect.Weak(jsx);
-    /** @type {Output} */
-    let output = /** @type {Node} */(parent).appendChild(jsx_create_text_node("", affector, sym_jsx)); // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
+    const affector = /** @type {JsxEffect} */ (new Effect.Weak(/** @type {(effect: Effect) => void} */ (jsx)));
+    affector[0] = /** @type {Output} */(/** @type {Node} */(parent).appendChild(jsx_create_text_node("", affector)));
+    affector.length = 1;
     affector.run();
-    function jsx() {
+    /** @param {JsxEffect} effect */
+    function jsx(effect) {
         const value = state();
-        parent = jsx_select_parent(output, parent);
-        output = jsx_replace_output(parent, output, jsx_compute_derivable_nodes(value, affector, sym_jsx), sym_jsx);
-        parent = jsx_last_output(output).parentNode;
+        parent = jsx_select_parent(effect[0], parent);
+        effect[0] = jsx_replace_output(parent, effect[0], jsx_compute_derivable_nodes(value, effect));
+        parent = jsx_last_output(effect[0]).parentNode;
     }
 }
 
-/** @param {Nodes} v @param {Effect} affector @param {symbol} sym_jsx @returns {Output} */
-function jsx_compute_derivable_nodes(v, affector, sym_jsx) {
+/** @param {Nodes} v @param {Effect} affector @returns {Output} */
+function jsx_compute_derivable_nodes(v, affector) {
     if (v instanceof Derived) {
         // TODO! handle nested derived
     }
@@ -534,10 +537,15 @@ function jsx_compute_derivable_nodes(v, affector, sym_jsx) {
         if (typeof v == "symbol") throw new TypeError("jsx: symbol cannot be rendered");
         // "string" | "number" | "bigint" == 6
         // "boolean" | "function" | "undefined" != 6
-        return jsx_create_text_node((typeof v).length == 6 ? "" + v : "", affector, sym_jsx);
+        return jsx_create_text_node((typeof v).length == 6 ? "" + v : "", affector);
     }
-    if (!v) return jsx_create_text_node("", affector, sym_jsx);
+    if (!v) return jsx_create_text_node("", affector);
     if (v instanceof Node) {
+        // TODO! if there are multiple nodes coming from the same effect this likely causes them to be placed multiple times in the tree
+        // this should not have any visible consequence but it does waste time
+        /** @type {JsxEffect | undefined} */
+        const effect = v[sym_jsx];
+        if (effect) return effect;
     } else if (is_view(v)) {
         v = v.view();
         if (!(v instanceof Node)) throw new TypeError("jsx: view method did not return a Node");
@@ -548,27 +556,27 @@ function jsx_compute_derivable_nodes(v, affector, sym_jsx) {
             throw new TypeError("jsx: invalid object returned by derivation, not a Node, View or Array");
         }
         if (!(v instanceof Derived.Array)) {
-            return /** @type {Nodes[]} */ (v).map(v => jsx_compute_derivable_nodes(v, affector, sym_jsx));
+            return /** @type {Nodes[]} */ (v).map(v => jsx_compute_derivable_nodes(v, affector));
         }
-        return jsx_compute_tracked_array(v, affector, sym_jsx);
+        return jsx_compute_tracked_array(v, affector);
     }
     if (v.nodeType == 11) {
         const output = [];
-        jsx_collect_document_fragment_children(output, sym_jsx, affector, v.childNodes);
-        if (!output.length) return jsx_create_text_node("", affector, sym_jsx);
+        jsx_collect_document_fragment_children(output, affector, v.childNodes);
+        if (!output.length) return jsx_create_text_node("", affector);
         return output;
     }
     v[sym_jsx] = affector;
     return v;
 }
 
-/** @param {Node[]} output @param {Effect} affector @param {symbol} sym_jsx @param {NodeListOf<ChildNode>} children */
-function jsx_collect_document_fragment_children(output, sym_jsx, affector, children) {
+/** @param {Node[]} output @param {Effect} affector @param {NodeListOf<ChildNode>} children */
+function jsx_collect_document_fragment_children(output, affector, children) {
     const length = children.length;
     for (let i = 0; i < length; i++) {
         const node = children[i];
         if (node.nodeType == 11) {
-            jsx_collect_document_fragment_children(output, sym_jsx, affector, node.childNodes);
+            jsx_collect_document_fragment_children(output, affector, node.childNodes);
         } else {
             output.push(node);
             node[sym_jsx] = affector;
@@ -576,15 +584,15 @@ function jsx_collect_document_fragment_children(output, sym_jsx, affector, child
     }
 }
 
-/** @param {Nodes[]} v  @param {Effect} [outer_affector] @param {symbol} [outer_sym_jsx] @returns {Exclude<Output, Node>} */
-function jsx_compute_tracked_array(v, outer_affector, outer_sym_jsx) {
+/** @param {Nodes[]} v  @param {Effect} [outer_affector] @returns {Exclude<Output, Node>} */
+function jsx_compute_tracked_array(v, outer_affector) {
     const affector = new Effect.Weak(jsx);
     const sym_jsx = Symbol("jsx");
-    const mapped = v.$map(v => jsx_compute_derivable_nodes(v, affector, sym_jsx));
-    const output = [jsx_create_text_node("", affector, sym_jsx)]; // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
+    const mapped = v.$map(v => jsx_compute_derivable_nodes(v, affector));
+    const output = [jsx_create_text_node("", affector)]; // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
     /** @type {Node | null} */
     let parent = null;
-    if (outer_sym_jsx) jsx[outer_sym_jsx] = outer_affector;
+    if (outer_affector) jsx[sym_jsx] = outer_affector;
     affector.run();
     return output;
     function jsx() {
@@ -592,8 +600,8 @@ function jsx_compute_tracked_array(v, outer_affector, outer_sym_jsx) {
         Derived.now(() => {
             const new_output = Array.from(mapped);
             parent = jsx_select_parent(output, parent);
-            if (new_output.length == 0) new_output[0] = jsx_create_text_node("", affector, sym_jsx);
-            jsx_replace_output(parent, output, new_output, sym_jsx);
+            if (new_output.length == 0) new_output[0] = jsx_create_text_node("", affector);
+            jsx_replace_output(parent, output, new_output);
             parent = jsx_last_output(new_output).parentNode;
             output.length = 0;
             output.push.apply(output, new_output);
@@ -601,8 +609,8 @@ function jsx_compute_tracked_array(v, outer_affector, outer_sym_jsx) {
     }
 }
 
-/** @param {string} v @param {Effect} affector @param {symbol} sym_jsx  @returns {Text} */
-function jsx_create_text_node(v, affector, sym_jsx) {
+/** @param {string} v @param {Effect} affector @returns {Text} */
+function jsx_create_text_node(v, affector) {
     const text = document.createTextNode(v);
     /** @type {any} */ (text)[sym_jsx] = affector;
     return text;
@@ -620,7 +628,7 @@ function is_view(arg) {
  * if all nodes in output have two or more parents (ignoring nulls) returns prefered_parent
  * @param {Output} output @param {Node | null} prefered_parent @returns {Node | null} */
 function jsx_select_parent(output, prefered_parent) {
-    if (!Array.isArray(output)) {
+    if (output instanceof Node) {
         return output.parentNode;
     }
     let first_occourence = null;
@@ -637,8 +645,8 @@ function jsx_select_parent(output, prefered_parent) {
     return first_occourence;
 }
 
-/** @param {Node | null} parent @param {Output} old_output @param {Output} new_output @param {symbol} sym_jsx @returns {Output} */
-function jsx_replace_output(parent, old_output, new_output, sym_jsx) {
+/** @param {Node | null} parent @param {Output} old_output @param {Output} new_output @returns {Output} */
+function jsx_replace_output(parent, old_output, new_output) {
     while (Array.isArray(old_output) && old_output.length == 1) old_output = old_output[0];
     while (Array.isArray(new_output) && new_output.length == 1) new_output = new_output[0];
     // 0. special case, if it is just text changing, don't swap the nodes
@@ -650,7 +658,7 @@ function jsx_replace_output(parent, old_output, new_output, sym_jsx) {
     const new_arr = [];
     recursive_collect_output(new_output, new_arr);
     // 1. detach ourselves from old nodes that moved parents, and remove old nodes that are no longer part of the output
-    let lastNode = recursive_remove_and_detach_old_output(old_output, new_arr, parent, sym_jsx) || null;
+    let lastNode = recursive_remove_and_detach_old_output(old_output, new_arr, parent) || null;
     // if there is no parent, undo sym_jsx references from the old nodes, (that are not also new_nodes)
     // and remove the new output (from wherever they are because we are at null so they also need to be at null)
     if (!parent) {
@@ -673,7 +681,7 @@ function jsx_replace_output(parent, old_output, new_output, sym_jsx) {
 
     /** @param {Output} output @param {Node[]} arr */
     function recursive_collect_output(output, arr) {
-        if (Array.isArray(output)) {
+        if (!(output instanceof Node)) {
             for (let i = 0; i < output.length; i++) {
                 recursive_collect_output(output[i], arr);
             }
@@ -682,12 +690,12 @@ function jsx_replace_output(parent, old_output, new_output, sym_jsx) {
         }
     }
     
-    /** @param {Output} output @param {Node[]} new_arr @param {Node | null} parent @param {symbol} sym_jsx @returns {Node | null | undefined} */
-    function recursive_remove_and_detach_old_output(output, new_arr, parent, sym_jsx) {
+    /** @param {Output} output @param {Node[]} new_arr @param {Node | null} parent @returns {Node | null | undefined} */
+    function recursive_remove_and_detach_old_output(output, new_arr, parent) {
         let lastNode = undefined;
-        if (Array.isArray(output)) {
+        if (!(output instanceof Node)) {
             for (let i = 0; i < output.length; i++) {
-                const newLastNode = recursive_remove_and_detach_old_output(output[i], new_arr, parent, sym_jsx);
+                const newLastNode = recursive_remove_and_detach_old_output(output[i], new_arr, parent);
                 if (newLastNode !== undefined) lastNode = newLastNode;
             }
         } else if (output.parentNode != parent) {

@@ -14,7 +14,7 @@ export * from "./scope";
  * 3. Node (added to the tree)
  * 4. View (the view method is called)
  * 5. Iterable (iterated and each item is added)
- * 6. Derived (will be updated automatically, nested derives are not allowed)
+ * 6. Derived (will be updated automatically)
  */
 export type Nodes = SimpleNodes | Derived<SimpleNodes>;
 
@@ -34,7 +34,7 @@ export type SimpleNodes =
 
 /** the output of a jsx element
  *
- * can be called to cast things into nodes
+ * the Elems function can be called to cast things into nodes
  *
  * 1. string, number and bigint (text node)
  * 2. undefined, null and boolean (render nothing)
