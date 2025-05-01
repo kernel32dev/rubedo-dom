@@ -331,34 +331,47 @@ function jsx_apply_props(elem, props) {
             }
         } else {
             const name = elem instanceof SVGElement ? key : key.toLowerCase();
-            new Effect(elem, () => {
-                const v = Derived.use(value);
-                if (typeof v === "string" || typeof v === "number" || typeof v === "bigint") {
-                    elem.setAttribute(name, "" + v);
-                } else if (typeof v === "function") {
-                    throw new Error("jsx: unsupported function attribute " + name);
-                } else if (typeof v === "boolean") {
-                    if (v) {
-                        elem.setAttribute(name, "");
-                    } else {
-                        elem.removeAttribute(name);
-                    }
-                } else if (typeof v === "undefined") {
-                    elem.removeAttribute(name);
-                } else if (typeof v === "object") {
-                    if (v === null) {
-                        elem.removeAttribute(name);
-                    } else if (name === "style") {
-                        elem.style.cssText = "";
-                        for (const key in v) {
-                            const kebab = key.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
-                            elem.style.setProperty(kebab, "" + v[key]);
-                        }
-                    } else {
-                        throw new Error("jsx: unsupported object attribute " + name);
-                    }
-                }
-            }).run();
+            if (value instanceof Derived) {
+                new Effect(elem, () => {
+                    const v = value();
+                    Derived.now(() => jsx_apply_value_prop(elem, name, v));
+                }).run();
+            } else {
+                jsx_apply_value_prop(elem, name, value);
+            }
+        }
+    }
+}
+
+/**
+ * @param {HTMLElement | SVGElement} elem 
+ * @param {string} name 
+ * @param {unknown} value 
+ */
+function jsx_apply_value_prop(elem, name, value) {
+    if (typeof value === "string" || typeof value === "number" || typeof value === "bigint") {
+        elem.setAttribute(name, "" + value);
+    } else if (typeof value === "function") {
+        throw new Error("jsx: unsupported function attribute " + name);
+    } else if (typeof value === "boolean") {
+        if (value) {
+            elem.setAttribute(name, "");
+        } else {
+            elem.removeAttribute(name);
+        }
+    } else if (typeof value === "undefined") {
+        elem.removeAttribute(name);
+    } else if (typeof value === "object") {
+        if (value === null) {
+            elem.removeAttribute(name);
+        } else if (name === "style") {
+            elem.style.cssText = "";
+            for (const key in value) {
+                const kebab = key.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+                elem.style.setProperty(kebab, "" + value[key]);
+            }
+        } else {
+            throw new Error("jsx: unsupported object attribute " + name);
         }
     }
 }
