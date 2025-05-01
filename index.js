@@ -558,7 +558,10 @@ function jsx_compute_derivable_nodes(v, affector) {
         // this should not have any visible consequence but it does waste time
         /** @type {JsxEffect | undefined} */
         const effect = v[sym_jsx];
-        if (effect) return effect;
+        if (effect) {
+            effect[sym_jsx] = affector;
+            return effect;
+        }
     } else if (is_view(v)) {
         v = v.view();
         if (!(v instanceof Node)) throw new TypeError("jsx: view method did not return a Node");
@@ -599,10 +602,12 @@ function jsx_collect_document_fragment_children(output, affector, children) {
 
 /** @param {Nodes[]} v  @param {Effect} [outer_affector] @returns {Exclude<Output, Node>} */
 function jsx_compute_tracked_array(v, outer_affector) {
-    const affector = new Effect.Weak(jsx);
+    const affector = /** @type {JsxEffect} */ (new Effect.Weak(jsx));
     const sym_jsx = Symbol("jsx");
     const mapped = v.$map(v => jsx_compute_derivable_nodes(v, affector));
     const output = [jsx_create_text_node("", affector)]; // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
+    affector[0] = output;
+    affector.length = 1;
     /** @type {Node | null} */
     let parent = null;
     if (outer_affector) jsx[sym_jsx] = outer_affector;
@@ -707,6 +712,7 @@ function jsx_replace_output(parent, old_output, new_output) {
     function recursive_remove_and_detach_old_output(output, new_arr, parent) {
         let lastNode = undefined;
         if (!(output instanceof Node)) {
+            delete output[sym_jsx];
             for (let i = 0; i < output.length; i++) {
                 const newLastNode = recursive_remove_and_detach_old_output(output[i], new_arr, parent);
                 if (newLastNode !== undefined) lastNode = newLastNode;
