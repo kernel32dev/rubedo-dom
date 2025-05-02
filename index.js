@@ -558,7 +558,7 @@ function jsx_compute_derivable_nodes(v, affector) {
         // this should not have any visible consequence but it does waste time
         /** @type {JsxEffect | undefined} */
         const effect = v[sym_jsx];
-        if (effect) {
+        if (effect && effect != affector) {
             effect[sym_jsx] = affector;
             return effect;
         }
@@ -603,13 +603,13 @@ function jsx_collect_document_fragment_children(output, affector, children) {
 /** @param {Nodes[]} v  @param {Effect} [outer_affector] @returns {Exclude<Output, Node>} */
 function jsx_compute_tracked_array(v, outer_affector) {
     const affector = /** @type {JsxEffect} */ (new Effect.Weak(jsx));
-    const sym_jsx = Symbol("jsx");
     const mapped = v.$map(v => jsx_compute_derivable_nodes(v, affector));
     const output = [jsx_create_text_node("", affector)]; // TODO! find a better way of initializing elements into a container that does not invole a dummy first element
     affector[0] = output;
     affector.length = 1;
     /** @type {Node | null} */
     let parent = null;
+    // if (outer_affector) jsx[Symbol("jsx_outer")] = outer_affector;
     if (outer_affector) jsx[sym_jsx] = outer_affector;
     affector.run();
     return output;
